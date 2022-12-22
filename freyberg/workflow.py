@@ -26,12 +26,12 @@ label_dict = {"head": "headwater",
              "gage": "sw_1"}
 
 if sys.platform.startswith('win'):
-    exe_dir = os.path.join("..","..","bin","win")
+    exe_dir = os.path.join("bin_new","win")
     mf_exe = 'mf6.exe'
     pst_exe = 'pestpp-ies.exe'
 
 elif sys.platform.startswith('linux'):
-    exe_dir = os.path.join("..","..","bin","linux")
+    exe_dir = os.path.join("bin_new","linux")
 
     mf_exe = 'mf6'
     pst_exe = 'pestpp-ies'
@@ -40,7 +40,7 @@ elif sys.platform.startswith('linux'):
     os.system(f'chmod +x {os.path.join(exe_dir, pst_exe)}')
 
 elif sys.platform.lower().startswith('dar') or sys.platform.lower().startswith('mac'):
-    exe_dir = os.path.join("..","..","bin","mac")
+    exe_dir = os.path.join("bin_new","mac")
     mf_exe = 'mf6'
     pst_exe = 'pestpp-ies'
 
@@ -51,6 +51,20 @@ else:
 
 
 def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=True):
+
+    if os.path.exists(os.path.join(org_ws, mf_exe)):
+        os.remove(os.path.join(org_ws, mf_exe))
+    shutil.copy(os.path.join(exe_dir, mf_exe), os.path.join(org_ws, mf_exe))
+    if os.path.exists(os.path.join(org_ws, pst_exe)):
+        os.remove(os.path.join(org_ws, pst_exe))
+    shutil.copy(os.path.join(exe_dir, pst_exe), os.path.join(org_ws, pst_exe))
+    if os.path.exists(os.path.join(org_ws, "pyemu")):
+        shutil.rmtree(os.path.join(org_ws, "pyemu"),ignore_errors=True)
+    shutil.copytree("pyemu", os.path.join(org_ws, "pyemu"))
+    if os.path.exists(os.path.join(org_ws, "flopy")):
+        shutil.rmtree(os.path.join(org_ws, "flopy"),ignore_errors=True)
+    shutil.copytree("flopy", os.path.join(org_ws, "flopy"))
+
     # load the mf6 model with flopy to get the spatial reference
     sim = flopy.mf6.MFSimulation.load(sim_ws=org_ws)
     m = sim.get_model("freyberg6")
@@ -315,7 +329,7 @@ def make_kickass_figs(m_d_c = "master_flow_prior",m_d_f = "master_flow_post",
         ax.set_xlabel(label)
         ax.set_title(title,loc="left")
     plt.tight_layout()
-    plt.savefig(plt_name+".pdf")
+    plt.savefig(plt_name)
     plt.close(fig)
 
     def namer(name):
@@ -333,19 +347,21 @@ def make_kickass_figs(m_d_c = "master_flow_prior",m_d_f = "master_flow_post",
             full_name = "surface-water flow"
         return full_name
 
-
-    with PdfPages(plt_name+"_si.pdf") as pdf:
+    forecasts = ["trgw_0_80_20","trgw_2_80_20","headwater"]
+    with PdfPages("flow_results_si.pdf") as pdf:
         ax_count = 0
-        for grp in grps:
-            gobs = obs.loc[obs.obgnme==grp,:].copy()
+        #for grp in grps:
+        for fore,title,label in zip(forecasts,titles, labels):
+            gobs = obs.loc[obs.obsnme.str.contains(fore),:].copy()
             gobs.sort_values(by="time",inplace=True)
             fig,ax = plt.subplots(1,1,figsize=(8,4))
             gtime = gobs.time.values.copy()
             gnames = gobs.obsnme.values.copy()
-            [ax.plot(gtime,oe_pr.loc[i,gnames],"0.5",lw=0.1,alpha=0.5) for i in oe_pr.index]
-            [ax.plot(gtime, oe_pt.loc[i, gnames], "b", lw=0.1,alpha=0.5) for i in oe_pt.index]
+            [ax.plot(gtime,oe_pr.loc[i,gnames].values,"0.5",lw=0.1,alpha=0.5) for i in oe_pr.index]
+            [ax.plot(gtime, oe_pt.loc[i, gnames].values, "b", lw=0.1,alpha=0.5) for i in oe_pt.index]
             ax.set_xlabel("time")
-            ax.set_title("{0}) {1}".format(ax_count,namer(grp)),loc="left")
+            ax.set_ylabel(label)
+            ax.set_title("{0}".format(title),loc="left")
             ax_count += 1
             plt.tight_layout()
             pdf.savefig()
@@ -880,24 +896,32 @@ def mod_to_stationary(org_t_d):
 
 if __name__ == "__main__":
 
-    #setup_interface("temp_daily_test",num_reals=500,full_interface=False,include_constants=True)
-    #set_obsvals_weights("daily_template_cond")
-    #m_d = run("daily_template_cond", num_workers=50, num_reals=500, noptmax=6, init_lam=-0.1)
-    #build_localizer(new_t_d)
-    #m_d = run(new_t_d,num_workers=50,num_reals=500,noptmax=6,init_lam=-0.1)
-    processing.plot_results_pub("daily_master_cond", pstf="freyberg", log_oe=False,noptmax=6)
-    #processing.plot_histo_pub("daily_master_cond", pstf="freyberg", log_oe=False, noptmax=6)
-    # cond_m_d = "daily_master_cond"
+    # setup_interface("freyberg_daily",num_reals=500,full_interface=False,include_constants=True)
+    cond_t_d = "daily_template_cond"
+    # set_obsvals_weights(cond_t_d)
+    # build_localizer(cond_t_d)
+    # cond_m_d = run(cond_t_d,num_workers=20,num_reals=500,noptmax=6,init_lam=-0.1)
+    cond_m_d = "daily_master_cond"
+    
+    
+    # setup_interface("freyberg_daily",num_reals=500,full_interface=True,include_constants=True)
+    # flow_t_d = "daily_template"
     # transfer_pars(os.path.join(cond_m_d,"freyberg.pst"),
-    #               os.path.join(cond_m_d,"freyberg.0.par.jcb"),
-    #               "daily_template","cond_prior.jcb")
-    # run("daily_template",num_workers=15,num_reals=100,noptmax=-1,m_d="master_flow_prior")
+    #              os.path.join(cond_m_d,"freyberg.0.par.jcb"),
+    #              flow_t_d,"cond_prior.jcb")
+    # flow_m_d = run(flow_t_d,num_workers=8,num_reals=100,noptmax=-1,m_d="master_flow_prior")
     # transfer_pars(os.path.join(cond_m_d,"freyberg.pst"),
-    #               os.path.join(cond_m_d,"freyberg.6.par.jcb"),
-    #               "daily_template","cond_post.jcb")
-    # make_kickass_figs()
+    #                os.path.join(cond_m_d,"freyberg.6.par.jcb"),
+    #                flow_t_d,"cond_post.jcb")
+    # flow_m_d = run(flow_t_d,num_workers=8,num_reals=100,noptmax=-1,m_d="master_flow_post")
+    
+    #make_kickass_figs()
+    #plot_mult(cond_t_d)
+    #plot_domain()
+    processing.plot_results_pub(cond_m_d, pstf="freyberg", log_oe=False,noptmax=6)
+    processing.plot_histo_pub(cond_m_d,pstf="freyberg",log_oe=False,noptmax=6)
     #processing.plot_histo("daily_master_cond", pstf="freyberg", log_oe=False, noptmax=6)
-    # processing.plot_par_changes("daily_master_cond")
+    processing.plot_par_changes(cond_m_d)
 
     # new_t_d = mod_to_stationary("daily_template_cond")
     # build_localizer(new_t_d)
