@@ -631,7 +631,7 @@ def plot_mult(t_d):
     #return
     pst = pyemu.Pst(os.path.join(t_d,"freyberg.pst"))
     pe = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,"prior.jcb")).loc[:,pst.par_names]
-    pst.parameter_data.loc[:,"parval1"] = pe.iloc[0,:].values
+    pst.parameter_data.loc[:,"parval1"] = pe.iloc[1,:].values
     par = pst.parameter_data
     pps = par.loc[(par.ptype=='pp') & par.parnme.str.contains("npfklayer1")]
     pst.write_input_files(pst_path=t_d)
@@ -639,7 +639,8 @@ def plot_mult(t_d):
     pyemu.helpers.apply_list_and_array_pars()
     os.chdir("..")
     fig,axes = plt.subplots(1,df.shape[0]+2,figsize=(8.5,2))
-    org_arr = np.log10(np.loadtxt(os.path.join(t_d,df.org_file.iloc[0])))
+    #org_arr = np.log10(np.loadtxt(os.path.join(t_d,df.org_file.iloc[0])))
+    org_arr = np.loadtxt(os.path.join(t_d,df.org_file.iloc[0]))
     ib = np.loadtxt(os.path.join(t_d, "freyberg6.dis_idomain_layer1.txt")).reshape(org_arr.shape)
     org_arr[ib<=0] = np.nan
     new_arr = org_arr.copy()
@@ -651,7 +652,10 @@ def plot_mult(t_d):
         mx = max(mx,np.nanmax(arr))
         mn = min(mn,np.nanmin(arr))
 
-        new_arr *= arr
+        new_arr *= 10**arr
+
+    new_arr = np.log10(new_arr)
+    org_arr = np.log10(org_arr)
 
     cb = axes[0].imshow(org_arr,vmin=np.nanmin(new_arr),vmax=np.nanmax(new_arr))
     plt.colorbar(cb,ax=axes[0],label="$log_{10} \\frac{m}{d}$")
@@ -750,13 +754,16 @@ def plot_domain():
 
 if __name__ == "__main__":
 
+
     # setup the pest interface for conditioning realizations
     setup_interface("freyberg_daily",num_reals=500,full_interface=False,include_constants=True)
     cond_t_d = "daily_template_cond"
     
     # set the observed values and weights for the equality and inequality observations
     set_obsvals_weights(cond_t_d)
-    setup the localizer matrix
+    
+
+    # setup the localizer matrix
     build_localizer(cond_t_d)
     
     # run PESTPP-IES to condition the realizations
