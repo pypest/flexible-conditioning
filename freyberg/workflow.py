@@ -47,7 +47,7 @@ elif sys.platform.lower().startswith('dar') or sys.platform.lower().startswith('
     os.system(f'chmod +x {os.path.join(exe_dir, mf_exe)}')
     os.system(f'chmod +x {os.path.join(exe_dir, pst_exe)}')
 else:
-    raise Exception('***ERROR: OPERATING SYSTEM UNKOWN***')
+    raise Exception('***ERROR: OPERATING SYSTEM UNKNOWN***')
 
 
 def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=True):
@@ -69,7 +69,6 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
     sim = flopy.mf6.MFSimulation.load(sim_ws=org_ws)
     m = sim.get_model("freyberg6")
 
-    #fix the fucking wrapped format bullshit from the 1980s
     sim.simulation_data.max_columns_of_data = m.modelgrid.ncol
 
     # work out the spatial rediscretization factor
@@ -134,75 +133,39 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
             arr = np.loadtxt(os.path.join(template_ws,arr_file)).reshape(ib.shape)
             np.savetxt(os.path.join(template_ws,arr_file),arr,fmt="%15.6E")
         
-        # if this is the recharge tag
-        # if "rch" in tag:
-        #     # add one set of grid-scale parameters for all files
-        #     pf.add_parameters(filenames=arr_files, par_type="grid", par_name_base="rch_gr",
-        #                       pargp="rch_gr", zone_array=ib, upper_bound=ub, lower_bound=lb,
-        #                       geostruct=rch_gs)
-        #
-        #     # add one constant parameter for each array, and assign it a datetime
-        #     # so we can work out the temporal correlation
-        #     for arr_file in arr_files:
-        #         kper = int(arr_file.split('.')[1].split('_')[-1]) - 1
-        #         pf.add_parameters(filenames=arr_file,par_type="constant",par_name_base=arr_file.split('.')[1]+"_cn",
-        #                           pargp="rch_const",zone_array=ib,upper_bound=ub,lower_bound=lb,geostruct=temporal_gs,
-        #                           datetime=dts[kper])
-        # otherwise...
-        else:
-            # for each array add both grid-scale and pilot-point scale parameters
-            for arr_file in arr_files:
-                if ("sy" in arr_file and
-                        int(arr_file.strip(".txt").split('layer')[-1]) > 1):
-                    continue
-                pf.add_parameters(filenames=arr_file,par_type="grid",par_name_base=arr_file.split('.')[1].replace("_","")+"_gr",
-                                  pargp=arr_file.split('.')[1].replace("_","")+"_gr",zone_array=ib,upper_bound=ub,lower_bound=lb,
-                                  geostruct=grid_gs)
-                pf.add_parameters(filenames=arr_file, par_type="pilotpoints", par_name_base=arr_file.split('.')[1].replace("_","")+"_pp",
-                                  pargp=arr_file.split('.')[1].replace("_","")+"_pp", zone_array=ib,upper_bound=ub,lower_bound=lb,
-                                  pp_space=int(5 * redis_fac),geostruct=pp_gs)
-                if include_constants:
-                    pf.add_parameters(filenames=arr_file, par_type="constant",
-                                      par_name_base=arr_file.split('.')[1].replace("_", "") + "_cn",
-                                      pargp=arr_file.split('.')[1].replace("_", "") + "_cn", zone_array=ib,
-                                      upper_bound=ub, lower_bound=lb)
+        
+        # for each array add both grid-scale and pilot-point scale parameters
+        for arr_file in arr_files:
+            if ("sy" in arr_file and
+                    int(arr_file.strip(".txt").split('layer')[-1]) > 1):
+                continue
+            pf.add_parameters(filenames=arr_file,par_type="grid",par_name_base=arr_file.split('.')[1].replace("_","")+"_gr",
+                              pargp=arr_file.split('.')[1].replace("_","")+"_gr",zone_array=ib,upper_bound=ub,lower_bound=lb,
+                              geostruct=grid_gs)
+            pf.add_parameters(filenames=arr_file, par_type="pilotpoints", par_name_base=arr_file.split('.')[1].replace("_","")+"_pp",
+                              pargp=arr_file.split('.')[1].replace("_","")+"_pp", zone_array=ib,upper_bound=ub,lower_bound=lb,
+                              pp_space=int(5 * redis_fac),geostruct=pp_gs)
+            if include_constants:
+                pf.add_parameters(filenames=arr_file, par_type="constant",
+                                  par_name_base=arr_file.split('.')[1].replace("_", "") + "_cn",
+                                  pargp=arr_file.split('.')[1].replace("_", "") + "_cn", zone_array=ib,
+                                  upper_bound=ub, lower_bound=lb)
 
-                ar = np.loadtxt(os.path.join(pf.new_d, arr_file))
-                np.savetxt(os.path.join(pf.new_d, f"log_{arr_file}"),
-                           np.log10(ar))
-                np.savetxt(os.path.join(pf.new_d, f"log_dup_{arr_file}"),
-                           np.log10(ar))
-                pf.add_observations(filename=f"log_{arr_file}",
-                                    obsgp=arr_file.split('.')[1].replace("_", ""),
-                                    prefix=arr_file.split('.')[1].replace("_", ""))
-                if "_ss" in tag or "_sy" in tag:
-                    pf.add_observations(filename=f"log_dup_{arr_file}",
-                                        obsgp="dup-"+arr_file.split('.')[1].replace("_", ""),
-                                        prefix="dup-"+arr_file.split('.')[1].replace("_", ""))
+            ar = np.loadtxt(os.path.join(pf.new_d, arr_file))
+            np.savetxt(os.path.join(pf.new_d, f"log_{arr_file}"),
+                       np.log10(ar))
+            np.savetxt(os.path.join(pf.new_d, f"log_dup_{arr_file}"),
+                       np.log10(ar))
+            pf.add_observations(filename=f"log_{arr_file}",
+                                obsgp=arr_file.split('.')[1].replace("_", ""),
+                                prefix=arr_file.split('.')[1].replace("_", ""))
+            if "_ss" in tag or "_sy" in tag:
+                pf.add_observations(filename=f"log_dup_{arr_file}",
+                                    obsgp="dup-"+arr_file.split('.')[1].replace("_", ""),
+                                    prefix="dup-"+arr_file.split('.')[1].replace("_", ""))
 
 
     if full_interface:
-        # # get all the list-type files associated with the wel package
-        # list_files = [f for f in os.listdir(org_ws) if "freyberg6.wel_stress_period_data_" in f and f.endswith(".txt")]
-        # # for each wel-package list-type file
-        # for list_file in list_files:
-        #     kper = int(list_file.split(".")[1].split('_')[-1]) - 1
-        #     # add spatially constant, but temporally correlated parameter
-        #     pf.add_parameters(filenames=list_file,par_type="constant",par_name_base="twel_mlt_{0}".format(kper),
-        #                       pargp="twel_mlt".format(kper),index_cols=[0,1,2],use_cols=[3],
-        #                       upper_bound=1.5,lower_bound=0.5, datetime=dts[kper], geostruct=temporal_gs)
-        #
-        #     # add temporally indep, but spatially correlated grid-scale parameters, one per well
-        #     pf.add_parameters(filenames=list_file, par_type="grid", par_name_base="wel_grid_{0}".format(kper),
-        #                       pargp="wel_{0}".format(kper), index_cols=[0, 1, 2], use_cols=[3],
-        #                       upper_bound=1.5, lower_bound=0.5)
-        #
-        # # add grid-scale parameters for SFR reach conductance.  Use layer, row, col and reach
-        # # number in the parameter names
-        # pf.add_parameters(filenames="freyberg6.sfr_packagedata.txt", par_name_base="sfr_rhk",
-        #                   pargp="sfr_rhk", index_cols=[0,1,2,3], use_cols=[9], upper_bound=10.,
-        #                   lower_bound=0.1,
-        #                   par_type="grid")
 
         # add observations from the sfr observation output file
         df = pd.read_csv(os.path.join(org_ws, "sfr.csv"), index_col=0)
@@ -466,11 +429,6 @@ def set_obsvals_weights(t_d,double_ineq_ss=True):
         print(missing)
         raise Exception("missing dups...")
 
-    # wdf = pd.read_csv(os.path.join(t_d,"freyberg6.wel_stress_period_data_1.txt"),header=None,names=["l","r","c","flux"],delim_whitespace=True)
-    # wdf.loc[:,"kij"] = wdf.apply(lambda x: (int(x.l)-1,int(x.r)-1,int(x.c)-1),axis=1)
-    # wkij = set(wdf.kij.tolist())
-    # w_nznames = obs.loc[obs.apply(lambda x: x.kij in wkij and "npfk" in x.oname and "dup" not in x.oname,axis=1),"obsnme"]
-
     vals = np.random.normal(0,1.0,len(hk_nznames))
     #set one really low
     vals[-1] = -2.0
@@ -524,13 +482,7 @@ def set_obsvals_weights(t_d,double_ineq_ss=True):
         factor="eigen",
     )
     obs = pst.observation_data
-    # lb_dict = obs.lower_bound.to_dict()
-    # ub_dict = obs.upper_bound.to_dict()
-    # for oname in nzobs.obsnme:
-    #     vals = df.loc[:,oname].values
-    #     vals[vals<lb_dict[oname]] = lb_dict[oname]
-    #     vals[vals > ub_dict[oname]] = ub_dict[oname]
-    #     df.loc[:,oname] = vals
+    
     pyemu.ObservationEnsemble(pst, df).to_binary(
         os.path.join(t_d, "freyberg.obs+noise_0.jcb")
     )
@@ -656,9 +608,6 @@ def transfer_pars(cond_pst_file,cond_pe_file,flow_t_d,joint_pe_file):
     cond_pe = cond_pe.loc[common,:]
     flow_pe = flow_pe.loc[common,:]
 
-    #if "base" in cond_pe.index:
-    #    cond_pe = cond_pe.loc[cond_pe.index.map(lambda x: "base" not in x),:]
-
     cond_names = set(cond_pe.columns.to_list())
     flow_names = set(flow_pe.columns.to_list())
     d = cond_names - flow_names
@@ -756,12 +705,6 @@ def plot_domain():
     sfr_arr[:60, 47] = 1
     sfr_arr[60:, 47] = 2
 
-    #sfr_arr = np.ma.masked_where(sfr_arr == 0,sfr_arr)
-    #print(np.unique(sfr_arr))
-    #plt.imshow(sfr_arr)
-    # axes[0].scatter([47],[118],marker="^",color="k",s=30)
-    #axes[0].set_ylim(119, 0)
-
     fig,axes = plt.subplots(1,5,figsize=(8,3))
     for i,ax in enumerate(axes[:-1]):
 
@@ -804,139 +747,50 @@ def plot_domain():
     plt.savefig("domain.pdf")
     return
 
-    ivals = [ij[0] for ij in c_grp[0] if True in [True if "greater_than" in grp else False for grp in g_grp[ij]]]
-    jvals = [ij[1] for ij in c_grp[0] if True in [True if "greater_than" in grp else False for grp in g_grp[ij]]]
-    axes[0].scatter(jvals,ivals,marker=">",color="r",s=20,
-                    label="greater-than inequality obs")
-    #ivals = [ij[0] for ij in c_grp[0] if "less_than" in g_grp[ij]]
-    #jvals = [ij[1] for ij in c_grp[0] if "less_than" in g_grp[ij]]
-    ivals = [ij[0] for ij in c_grp[0] if True in [True if "less_than" in grp else False for grp in g_grp[ij]]]
-    jvals = [ij[1] for ij in c_grp[0] if True in [True if "less_than" in grp else False for grp in g_grp[ij]]]
-    axes[0].scatter(jvals, ivals, marker="P", color="r", s=100,
-
-                    label="less-than inequality obs")
-    #ivals = [ij[0] for ij in c_grp[0] if "greater_than" not in g_grp[ij] and "less_than" not in g_grp[ij]]
-    #jvals = [ij[1] for ij in c_grp[0] if "greater_than" not in g_grp[ij] and "less_than" not in g_grp[ij]]
-    ivals = [ij[0] for ij in c_grp[0] if True not in [True if "greater_than" in grp and "less_than" in grp else False for grp in g_grp[ij]]]
-    jvals = [ij[1] for ij in c_grp[0] if True not in [True if "greater_than" in grp and "less_than" in grp else False for grp in g_grp[ij]]]
-    axes[0].scatter(jvals, ivals, marker="o", color="r", s=20,
-                    label="equality obs")
-
-    axes[1].imshow(ib,cmap="Greys_r",alpha=0.25)
-    #ivals = [ij[0] for ij in c_grp[2] if "greater_than" in g_grp[ij]]
-    #jvals = [ij[1] for ij in c_grp[2] if "greater_than" in g_grp[ij]]
-    ivals = [ij[0] for ij in c_grp[2] if True in [True if "greater_than" in grp else False for grp in g_grp[ij]]]
-    jvals = [ij[1] for ij in c_grp[2] if True in [True if "greater_than" in grp else False for grp in g_grp[ij]]]
-    axes[1].scatter(jvals, ivals, marker=">", color="r", s=20,
-                    label="greater-than inequality obs")
-    #ivals = [ij[0] for ij in c_grp[0] if "less_than" in g_grp[ij]]
-    #jvals = [ij[1] for ij in c_grp[0] if "less_than" in g_grp[ij]]
-    ivals = [ij[0] for ij in c_grp[2] if True in [True if "less_than" in grp else False for grp in g_grp[ij]]]
-    jvals = [ij[1] for ij in c_grp[2] if True in [True if "less_than" in grp else False for grp in g_grp[ij]]]
-    axes[1].scatter(jvals, ivals, marker="P", color="r", s=100,
-                    label="less-than inequality obs")
-    #ivals = [ij[0] for ij in c_grp[2] if "greater_than" not in g_grp[ij]]
-    #jvals = [ij[1] for ij in c_grp[2] if "greater_than" not in g_grp[ij]]
-    ivals = [ij[0] for ij in c_grp[2] if
-             True not in [True if "greater_than" in grp and "less_than" in grp else False for grp in g_grp[ij]]]
-    jvals = [ij[1] for ij in c_grp[2] if
-             True not in [True if "greater_than" in grp and "less_than" in grp else False for grp in g_grp[ij]]]
-    axes[1].scatter(jvals, ivals, marker="o", color="r", s=20,
-                    label="equality obs")
-
-    sfr_arr = np.zeros_like(ib)
-    sfr_arr[:60,47] = 1
-    sfr_arr[60:, 47] = 2
-
-    sfr_arr[sfr_arr==0] = np.nan
-    axes[0].imshow(sfr_arr,cmap="winter")
-    axes[0].scatter(np.nan, np.nan, c='b', marker='|', label="headwater reaches")
-    axes[0].scatter([20],[80],marker="^",c='b',s=30, label="level forecast")
-    axes[1].scatter([20], [80], marker="^", c='b', s=30, label="level forecast")
-
-    #axes[0].scatter([47],[118],marker="^",color="k",s=30)
-    axes[0].set_ylim(119,0)
-    #axes[0].legend()
-    #axes[1].imshow(sfr_arr)
-    for ax in axes:
-        ax.set_ylabel("row")
-        ax.set_xlabel("column")
-
-    axes[0].set_title("A) layer 1",loc="left")
-    axes[1].set_title("B) layer 3",loc="left")
-
-    plt.tight_layout()
-    plt.savefig("domain.pdf")
-    plt.close(fig)
-
-
-
-def mod_to_stationary(org_t_d):
-    new_t_d = org_t_d+"_stat"
-    if os.path.exists(new_t_d):
-        shutil.rmtree(new_t_d)
-    shutil.copytree(org_t_d,new_t_d)
-    pst = pyemu.Pst(os.path.join(new_t_d,"freyberg.pst"))
-    obs = pst.observation_data
-    obs.loc[obs.obgnme.str.startswith("less") & obs.oname.str.contains("npf"),"weight"] = 0.0
-    obs.loc[obs.obgnme.str.startswith("greater") & obs.oname.str.contains("npf"), "weight"] = 0.0
-    obs.loc[obs.obsnme.str.contains("dup"), "weight"] = 0.0
-
-    obs.loc[obs.obgnme.str.contains("less") | obs.obgnme.str.contains("greater"), "obgnme"] = obs.loc[obs.obgnme.str.contains("less") | obs.obgnme.str.contains("greater"), "oname"].values
-
-    obs = pst.observation_data.loc[pst.nnz_obs_names,:]
-    onames = obs.oname.unique()
-    for oname in onames:
-        obs.loc[obs.oname==oname,"weight"] = obs.loc[obs.oname==oname,"weight"].max()
-
-    print(obs.loc[pst.nnz_obs_names,"obgnme"].unique())
-    pst.write(os.path.join(new_t_d,"freyberg.pst"),version=2)
-    return new_t_d
-
 
 if __name__ == "__main__":
 
-    # setup_interface("freyberg_daily",num_reals=500,full_interface=False,include_constants=True)
+    # setup the pest interface for conditioning realizations
+    setup_interface("freyberg_daily",num_reals=500,full_interface=False,include_constants=True)
     cond_t_d = "daily_template_cond"
-    # set_obsvals_weights(cond_t_d)
-    # build_localizer(cond_t_d)
-    # cond_m_d = run(cond_t_d,num_workers=20,num_reals=500,noptmax=6,init_lam=-0.1)
+    
+    # set the observed values and weights for the equality and inequality observations
+    set_obsvals_weights(cond_t_d)
+    setup the localizer matrix
+    build_localizer(cond_t_d)
+    
+    # run PESTPP-IES to condition the realizations
+    run(cond_t_d,num_workers=20,num_reals=500,noptmax=6,init_lam=-0.1)
     cond_m_d = "daily_master_cond"
     
+    # now setup a corresponding interface that will actually run MODFLOW
+    setup_interface("freyberg_daily",num_reals=500,full_interface=True,include_constants=True)
+    flow_t_d = "daily_template"
     
-    # setup_interface("freyberg_daily",num_reals=500,full_interface=True,include_constants=True)
-    # flow_t_d = "daily_template"
-    # transfer_pars(os.path.join(cond_m_d,"freyberg.pst"),
-    #              os.path.join(cond_m_d,"freyberg.0.par.jcb"),
-    #              flow_t_d,"cond_prior.jcb")
-    # flow_m_d = run(flow_t_d,num_workers=8,num_reals=100,noptmax=-1,m_d="master_flow_prior")
-    # transfer_pars(os.path.join(cond_m_d,"freyberg.pst"),
-    #                os.path.join(cond_m_d,"freyberg.6.par.jcb"),
-    #                flow_t_d,"cond_post.jcb")
-    # flow_m_d = run(flow_t_d,num_workers=8,num_reals=100,noptmax=-1,m_d="master_flow_post")
+    # transfer the prior realizations from the previous conditioning analysis into the MODFLOW interace template
+    # so that we are using identical realizations
+    transfer_pars(os.path.join(cond_m_d,"freyberg.pst"),
+                 os.path.join(cond_m_d,"freyberg.0.par.jcb"),
+                 flow_t_d,"cond_prior.jcb")
     
-    #make_kickass_figs()
-    #plot_mult(cond_t_d)
-    #plot_domain()
+    # run MODFLOW for the prior realizations
+    run(flow_t_d,num_workers=8,num_reals=100,noptmax=-1,m_d="master_flow_prior")
+    
+
+    # now transfer the conditioned realizations into the modflow interface
+    transfer_pars(os.path.join(cond_m_d,"freyberg.pst"),
+                   os.path.join(cond_m_d,"freyberg.6.par.jcb"),
+                   flow_t_d,"cond_post.jcb")
+
+    # now run modflow for the conditioned realizations
+    run(flow_t_d,num_workers=8,num_reals=100,noptmax=-1,m_d="master_flow_post")
+    
+    # now make all the figures for the manuscript
+    make_kickass_figs()
+    plot_mult(cond_t_d)
+    plot_domain()
     processing.plot_results_pub(cond_m_d, pstf="freyberg", log_oe=False,noptmax=6)
     processing.plot_histo_pub(cond_m_d,pstf="freyberg",log_oe=False,noptmax=6)
-    #processing.plot_histo("daily_master_cond", pstf="freyberg", log_oe=False, noptmax=6)
+    processing.plot_histo("daily_master_cond", pstf="freyberg", log_oe=False, noptmax=6)
     processing.plot_par_changes(cond_m_d)
-
-    # new_t_d = mod_to_stationary("daily_template_cond")
-    # build_localizer(new_t_d)
-
-    # cond_m_d = "daily_master_cond_stat"
-    # transfer_pars(os.path.join(cond_m_d,"freyberg.pst"),
-    #                os.path.join(cond_m_d,"freyberg.0.par.jcb"),
-    #                "daily_template","cond_prior.jcb")
-    # run("daily_template",num_workers=15,num_reals=100,noptmax=-1,m_d="master_flow_prior_stat")
-    # transfer_pars(os.path.join(cond_m_d,"freyberg.pst"),
-    #                os.path.join(cond_m_d,"freyberg.6.par.jcb"),
-    #                "daily_template","cond_post.jcb")
-    # run("daily_template", num_workers=15, num_reals=100, noptmax=-1, m_d="master_flow_post_stat")
-    #make_kickass_figs(m_d_c="master_flow_prior_stat",
-    #                  m_d_f="master_flow_post_stat",plt_name="flow_stat")
-    # plot_mult("daily_template_cond")
-    #plot_domain()
 
