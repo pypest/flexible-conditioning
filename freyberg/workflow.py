@@ -436,15 +436,25 @@ def set_obsvals_weights(t_d,double_ineq_ss=True):
         print(missing)
         raise Exception("missing dups...")
 
+    hk_iq_nzname = hk_nznames[-1]
+    hk_nznames = hk_nznames[:-1]
+
     vals = np.random.normal(0,1.0,len(hk_nznames))
     #set one really low
-    vals[-1] = -2.0
+    #vals[-1] = -2.0
     vals = pst.observation_data.loc[hk_nznames,"obsval"].values + vals
     pst.observation_data.loc[hk_nznames, "obsval"] = vals
 
     pst.observation_data.loc[hk_nznames, "lower_bound"] = vals - 2
     pst.observation_data.loc[hk_nznames, "upper_bound"] = vals + 2
     pst.observation_data.loc[hk_nznames, "weight"] = 1.0 + np.cumsum(np.ones(len(hk_nznames))+1)
+
+    val = pst.observation_data.loc[hk_iq_nzname,"obsval"] - 1.5
+    pst.observation_data.loc[hk_iq_nznames, "obsval"] = val
+    pst.observation_data.loc[hk_iq_nznames, "lower_bound"] = val - 1
+    pst.observation_data.loc[hk_iq_nznames, "upper_bound"] = val + 1
+    pst.observation_data.loc[hk_iq_nznames, "weight"] = 10.0
+    pst.observation_data.loc[hk_iq_nznames, "obgnme"] = "less_than_hk"
 
     vals = np.random.normal(1.5, 0.1, len(w_nznames))
     #vals = pst.observation_data.loc[w_nznames, "obsval"].values + vals
