@@ -50,7 +50,8 @@ else:
     raise Exception('***ERROR: OPERATING SYSTEM UNKNOWN***')
 
 
-def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=True):
+def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=True,
+    grid_gs=None,pp_gs=None, dir_suffix="template"):
 
     if os.path.exists(os.path.join(org_ws, mf_exe)):
         os.remove(os.path.join(org_ws, mf_exe))
@@ -76,7 +77,7 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
 
 
     # where the pest interface will be constructed
-    template_ws = org_ws.split('_')[1] + "_template"
+    template_ws = org_ws.split('_')[1] + "_"+dir_suffix
     if not full_interface:
         template_ws += "_cond"
     
@@ -88,12 +89,14 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
                 zero_based=False,start_datetime="1-1-2018")
 
     # the geostruct object for grid-scale parameters
-    grid_v = pyemu.geostats.ExpVario(contribution=1.0,a=500)
-    grid_gs = pyemu.geostats.GeoStruct(variograms=grid_v)
+    if grid_gs is None:
+        grid_v = pyemu.geostats.ExpVario(contribution=1.0,a=500)
+        grid_gs = pyemu.geostats.GeoStruct(variograms=grid_v)
 
     # the geostruct object for pilot-point-scale parameters
-    pp_v = pyemu.geostats.ExpVario(contribution=1.0, a=3000)
-    pp_gs = pyemu.geostats.GeoStruct(variograms=pp_v)
+    if pp_gs is None:
+        pp_v = pyemu.geostats.ExpVario(contribution=1.0, a=3000)
+        pp_gs = pyemu.geostats.GeoStruct(variograms=pp_v)
 
     # the geostruct for recharge grid-scale parameters
     rch_v = pyemu.geostats.ExpVario(contribution=1.0, a=1000)
@@ -194,7 +197,10 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
                  os.path.join(template_ws, pst_exe))
 
     # draw from the prior and save the ensemble in binary format
-    pe = pf.draw(num_reals, use_specsim=True)
+    use_specsim=True
+    if grid_gs.variograms[0].anisotropy != 1.0:
+        use_specsim = False
+    pe = pf.draw(num_reals, use_specsim=use_specsim)
     pe.to_binary(os.path.join(template_ws, "prior.jcb"))
 
     # set some algorithmic controls
@@ -227,6 +233,7 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
     shutil.copy(os.path.join(pf.new_d, "freyberg.obs_data.csv"),
                 os.path.join(pf.new_d, "freyberg.obs_data_orig.csv"))
     #assert pst.phi < 1.0e-5, pst.phi
+    return pf.new_d
 
 
 def run(t_d,num_workers=5,num_reals=100,noptmax=-1,m_d=None,init_lam=None):
@@ -623,7 +630,7 @@ def transfer_pars(cond_pst_file,cond_pe_file,flow_t_d,joint_pe_file):
     pyemu.os_utils.run("pestpp-ies freyberg.pst",cwd=flow_t_d)
 
 
-def plot_mult(t_d):
+def plot_mult(t_d,plt_name="mult.pdf"):
 
     df = pd.read_csv(os.path.join(t_d, "mult2model_info.csv"))
     df = df.loc[df.model_file.str.contains("npf_k_layer1"), :]
@@ -679,7 +686,7 @@ def plot_mult(t_d):
         ax.set_xlabel("column")
         ax.set_ylabel("row")
     plt.tight_layout()
-    plt.savefig("mult.pdf")
+    plt.savefig(plt_name)
     plt.close(fig)
 
 
@@ -752,8 +759,70 @@ def plot_domain():
     return
 
 
+def ensemble_stacking_experiment():
+    # the geostruct object for grid-scale parameters
+    
+    # grid_v = pyemu.geostats.ExpVario(contribution=1.0,a=3000,anisotropy=10,bearing=90)
+    # grid_gs = pyemu.geostats.GeoStruct(variograms=grid_v)    
+    # pp_v = pyemu.geostats.ExpVario(contribution=1.0, a=5000)
+    # pp_gs = pyemu.geostats.GeoStruct(variograms=pp_v)
+    # t_d = setup_interface("freyberg_daily",num_reals=100,full_interface=False,include_constants=True,grid_gs=grid_gs,pp_gs=pp_gs,dir_suffix="aniso1")
+    # plot_mult(t_d,plt_name="mult_aniso1.pdf")
+
+    # grid_v = pyemu.geostats.ExpVario(contribution=1.0,a=3000,anisotropy=10,bearing=180)
+    # grid_gs = pyemu.geostats.GeoStruct(variograms=grid_v)    
+    # pp_v = pyemu.geostats.ExpVario(contribution=1.0, a=5000)
+    # pp_gs = pyemu.geostats.GeoStruct(variograms=pp_v)
+    # t_d = setup_interface("freyberg_daily",num_reals=100,full_interface=False,include_constants=True,grid_gs=grid_gs,pp_gs=pp_gs,dir_suffix="aniso2")
+    # plot_mult(t_d,plt_name="mult_aniso2.pdf")
+
+    #t_d = setup_interface("freyberg_daily",num_reals=100,full_interface=False,include_constants=True,dir_suffix="base")
+    #plot_mult(t_d,plt_name="mult_base.pdf")
+
+    # now combine the three prior ensembles into one
+
+    #t_d = "daily_aniso1_cond"
+    #pst = pyemu.Pst(os.path.join(t_d,"freyberg.pst"))
+    
+    #pe1 = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,"prior.jcb"))
+    #t_d = "daily_aniso2_cond"
+    #pe2 = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,"prior.jcb"))
+    
+    #t_d = "daily_base_cond"
+    #pe3 = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,"prior.jcb"))
+    
+    #df = pd.concat([pe1._df,pe2._df,pe3._df],axis=0)
+    #df.index = np.arange(df.shape[0],dtype=int)
+    
+    #pyemu.ParameterEnsemble(pst=pst,df=df).to_binary(os.path.join(t_d,"prior_combine.jcb"))
+    #pst.pestpp_options["ies_par_en"] = "prior_combine.jcb"
+    #pst.pestpp_options["ies_num_reals"] = 300
+    #pst.write(os.path.join(t_d,"freyberg.pst"),version=2)
+    
+    # set the observed values and weights for the equality and inequality observations
+    #set_obsvals_weights(t_d)
+
+    # setup the localizer matrix
+    #build_localizer(t_d)
+
+    # run PESTPP-IES to condition the realizations
+    cond_m_d = "daily_cond_combine_master"
+    #run(t_d,num_workers=20,num_reals=300,noptmax=6,init_lam=-0.1,m_d=cond_m_d)
+    
+    #make_kickass_figs()
+    processing.plot_results_pub(cond_m_d, pstf="freyberg", log_oe=False,noptmax=4)
+    processing.plot_histo_pub(cond_m_d,pstf="freyberg",log_oe=False,noptmax=4)
+    processing.plot_histo(cond_m_d, pstf="freyberg", log_oe=False, noptmax=4)
+    processing.plot_par_changes(cond_m_d,noptmax=4)
+
+
+
+
 if __name__ == "__main__":
 
+
+    ensemble_stacking_experiment()
+    exit()
 
     # setup the pest interface for conditioning realizations
     setup_interface("freyberg_daily",num_reals=500,full_interface=False,include_constants=True)
@@ -798,6 +867,6 @@ if __name__ == "__main__":
     plot_domain()
     processing.plot_results_pub(cond_m_d, pstf="freyberg", log_oe=False,noptmax=6)
     processing.plot_histo_pub(cond_m_d,pstf="freyberg",log_oe=False,noptmax=6)
-    processing.plot_histo("daily_master_cond", pstf="freyberg", log_oe=False, noptmax=6)
+    processing.plot_histo(cond_m_d, pstf="freyberg", log_oe=False, noptmax=6)
     processing.plot_par_changes(cond_m_d)
 

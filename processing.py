@@ -767,7 +767,7 @@ def plot_results_pub(m_d, ardim=None, pstf="test_run", log_oe=True,noptmax=None)
 
             # a few reals
             irow = 1
-            for idx in pt_oe.index.values[1:2]:
+            for idx in pt_oe.index.values[5:6]:
                 #nz_arr = np.zeros((nrow, ncol))
                 #nz_arr[nzobs.i, nzobs.j] = noise.loc[idx,nzobs.obsnme].values
                 #nz_arr[nz_arr == 0] = np.NaN
