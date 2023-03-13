@@ -798,7 +798,7 @@ def ensemble_stacking_experiment():
     #t_d = "daily_aniso2_cond"
     #pe2 = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,"prior.jcb"))
     
-    #t_d = "daily_base_cond"
+    t_d = "daily_base_cond"
     #pe3 = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,"prior.jcb"))
     
     #df = pd.concat([pe1._df,pe2._df,pe3._df],axis=0)
@@ -816,14 +816,15 @@ def ensemble_stacking_experiment():
     #build_localizer(t_d)
 
     # run PESTPP-IES to condition the realizations
+    noptmax = 3
     cond_m_d = "daily_cond_combine_master"
-    #run(t_d,num_workers=20,num_reals=300,noptmax=6,init_lam=-0.1,m_d=cond_m_d)
+    run(t_d,num_workers=20,num_reals=300,noptmax=noptmax,init_lam=-0.1,m_d=cond_m_d)
     
     #make_kickass_figs()
-    processing.plot_results_pub(cond_m_d, pstf="freyberg", log_oe=False,noptmax=4)
-    processing.plot_histo_pub(cond_m_d,pstf="freyberg",log_oe=False,noptmax=4)
-    processing.plot_histo(cond_m_d, pstf="freyberg", log_oe=False, noptmax=4)
-    processing.plot_par_changes(cond_m_d,noptmax=4)
+    processing.plot_results_pub(cond_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
+    processing.plot_histo_pub(cond_m_d,pstf="freyberg",log_oe=False,noptmax=noptmax)
+    processing.plot_histo(cond_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+    processing.plot_par_changes(cond_m_d,noptmax=noptmax)
 
 
 
