@@ -414,9 +414,13 @@ def set_obsvals_weights(t_d,double_ineq_ss=True):
             exclude.extend([(i,j) for j in exclude_j])
         exclude = set(exclude)
         ijs = [ij for ij in ijs if ij not in exclude]
-    np.random.seed(222)
-    idxs = np.random.randint(0,len(ijs),4)
-    ijs = [ijs[i] for i in idxs]
+    #np.random.seed(222)
+    np.random.seed(555)
+    #idxs = np.random.randint(0,len(ijs),4)
+    #print(ijs)
+    #exit()
+    #ijs = [ijs[i] for i in idxs]
+    
     #pst = pyemu.Pst(os.path.join(t_d,"freyberg.pst"))
     #obs = pd.read_csv(os.path.join(t_d, "freyberg.obs_data_orig.csv"))
 
@@ -436,8 +440,8 @@ def set_obsvals_weights(t_d,double_ineq_ss=True):
         print(missing)
         raise Exception("missing dups...")
 
-    hk_iq_nzname = hk_nznames[-1]
-    hk_nznames = hk_nznames[:-1]
+    hk_iq_nznames = hk_nznames[::4]
+    hk_nznames = [n for n in hk_nznames if n not in hk_iq_nznames]
 
     vals = np.random.normal(0,1.0,len(hk_nznames))
     #set one really low
@@ -449,13 +453,13 @@ def set_obsvals_weights(t_d,double_ineq_ss=True):
     pst.observation_data.loc[hk_nznames, "upper_bound"] = vals + 2
     pst.observation_data.loc[hk_nznames, "weight"] = 1.0 + np.cumsum(np.ones(len(hk_nznames))+1)
 
-    val = pst.observation_data.loc[hk_iq_nzname,"obsval"] - 1.5
-    pst.observation_data.loc[hk_iq_nznames, "obsval"] = val
-    pst.observation_data.loc[hk_iq_nznames, "lower_bound"] = val - 1
-    pst.observation_data.loc[hk_iq_nznames, "upper_bound"] = val + 1
+    vals = pst.observation_data.loc[hk_iq_nznames,"obsval"] - 0.75
+    pst.observation_data.loc[hk_iq_nznames, "obsval"] = vals
+    #pst.observation_data.loc[hk_iq_nzname, "lower_bound"] = val - 1
+    #pst.observation_data.loc[hk_iq_nzname, "upper_bound"] = val + 1
     pst.observation_data.loc[hk_iq_nznames, "weight"] = 10.0
-    pst.observation_data.loc[hk_iq_nznames, "obgnme"] = "less_than_hk"
-
+    pst.observation_data.loc[hk_iq_nznames, "obgnme"] = obs.loc[hk_iq_nznames,"oname"].apply(lambda x: "less_than_"+x)
+    
     vals = np.random.normal(1.5, 0.1, len(w_nznames))
     #vals = pst.observation_data.loc[w_nznames, "obsval"].values + vals
     pst.observation_data.loc[w_nznames, "obsval"] = vals
@@ -467,6 +471,10 @@ def set_obsvals_weights(t_d,double_ineq_ss=True):
     pst.observation_data.loc[:,"observed_value"] = pst.observation_data.obsval.values
     vals = np.random.normal(0, 1.0, len(ss_nznames))
     if double_ineq_ss is True:
+        skip_ijs = [obs.loc[n,"ij"] for n in hk_iq_nznames]
+        ss_nznames = [n for n in ss_nznames if obs.loc[n,"ij"] not in skip_ijs]
+        dup_ss_nznames = [n.replace("sto","dup-sto") for n in ss_nznames]
+        vals = np.random.normal(0, 1.0, len(ss_nznames))
         vals = pst.observation_data.loc[ss_nznames, "obsval"].values + vals
         pst.observation_data.loc[ss_nznames, "obsval"] = vals - 0.75
         pst.observation_data.loc[dup_ss_nznames, "obsval"] = vals + 0.75
@@ -499,6 +507,7 @@ def set_obsvals_weights(t_d,double_ineq_ss=True):
         factor="eigen",
     )
     obs = pst.observation_data
+    #print(df.loc[:,hk_iq_nznames])
     
     pyemu.ObservationEnsemble(pst, df).to_binary(
         os.path.join(t_d, "freyberg.obs+noise_0.jcb")
@@ -701,11 +710,11 @@ def plot_mult(t_d,plt_name="mult.pdf"):
 
 
 
-def plot_domain():
-    ib = np.loadtxt(os.path.join("daily_template", "freyberg6.dis_idomain_layer1.txt")).reshape((120,60))
+def plot_domain(c_t_d="daily_template_cond",t_d="daily_template"):
+    ib = np.loadtxt(os.path.join(t_d, "freyberg6.dis_idomain_layer1.txt")).reshape((120,60))
     ib[ib>0] = np.nan
-    pst_c = pyemu.Pst(os.path.join("daily_template_cond","freyberg.pst"))
-    pst = pyemu.Pst(os.path.join("daily_template","freyberg.pst"))
+    pst_c = pyemu.Pst(os.path.join(c_t_d,"freyberg.pst"))
+    pst = pyemu.Pst(os.path.join(t_d,"freyberg.pst"))
     obs_c = pst_c.observation_data.loc[pst_c.nnz_obs_names,:].copy()
     #print(obs_c.obgnme.unique())
     obs_c.loc[:,'k'] = obs_c.oname.apply(lambda x: int(x[-1])-1)
@@ -770,8 +779,7 @@ def plot_domain():
 
 
 def ensemble_stacking_experiment():
-    # the geostruct object for grid-scale parameters
-    
+
     # grid_v = pyemu.geostats.ExpVario(contribution=1.0,a=3000,anisotropy=10,bearing=90)
     # grid_gs = pyemu.geostats.GeoStruct(variograms=grid_v)    
     # pp_v = pyemu.geostats.ExpVario(contribution=1.0, a=5000)
@@ -810,15 +818,16 @@ def ensemble_stacking_experiment():
     #pst.write(os.path.join(t_d,"freyberg.pst"),version=2)
     
     # set the observed values and weights for the equality and inequality observations
-    #set_obsvals_weights(t_d)
-
+    set_obsvals_weights(t_d)
+    plot_domain(t_d)
+    
     # setup the localizer matrix
-    #build_localizer(t_d)
+    build_localizer(t_d)
 
     # run PESTPP-IES to condition the realizations
     noptmax = 3
     cond_m_d = "daily_cond_combine_master"
-    run(t_d,num_workers=20,num_reals=300,noptmax=noptmax,init_lam=-0.1,m_d=cond_m_d)
+    run(t_d,num_workers=20,num_reals=100,noptmax=noptmax,init_lam=-0.1,m_d=cond_m_d)
     
     #make_kickass_figs()
     processing.plot_results_pub(cond_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
