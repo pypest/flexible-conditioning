@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pyemu
+from scipy import stats
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.colors as colors
@@ -466,6 +467,7 @@ def plot_results(m_d, ardim=None, pstf="test_run", log_oe=True,noptmax=None):
 
 def namer(name):
     raw = name.split("_")[0]
+    print(raw)
     if ":" in raw:
         raw = raw.split(":")[1]
     layer = int(raw[-1])
@@ -519,10 +521,10 @@ def plot_histo(m_d, pstf="test_run", log_oe=True,noptmax=None):
 
             grp = obs.loc[name, "obgnme"]
             fig,ax = plt.subplots(1,1,figsize=(6,3))
-            ax.hist(pr_oe.loc[:,name],fc="0.5",ec="none",alpha=0.3)
-            ax.hist(pt_oe.loc[:, name], fc="b", ec="none", alpha=0.3)
+            ax.hist(pr_oe.loc[:,name],fc="0.5",ec="none",alpha=0.3,density=True)
+            ax.hist(pt_oe.loc[:, name], fc="b", ec="none", alpha=0.3,density=True)
             if log_noise.loc[:,name].var() > 1e-12 and not "less" in grp and not "great" in grp:
-                ax.hist(log_noise.loc[:,name],fc="r",ec="none",alpha=0.3)
+                ax.hist(log_noise.loc[:,name],fc="r",ec="none",alpha=0.3,density=True)
             v = obs.loc[name,"obsval"]
             ylim = ax.get_ylim()
             ax.plot([v,v],ylim,"r-",lw=2)
@@ -554,7 +556,7 @@ def plot_histo_pub(m_d, pstf="test_run", log_oe=True,noptmax=None):
     # units = ["$log_{10} \\frac{1}{m}$","$log_{10} \\frac{m}{d}$","$log_{10} \\frac{m}{d}$","$log_{10} \\frac{m}{d}$"]
 
     names = ["oname:npfklayer3_otype:arr_i:8_j:47","oname:npfklayer1_otype:arr_i:101_j:23",
-             "oname:npfklayer3_otype:arr_i:79_j:31","oname:stosslayer3_otype:arr_i:8_j:47"]
+             "oname:npfklayer3_otype:arr_i:79_j:31","oname:stosslayer1_otype:arr_i:74_j:14"]
     units = ["$log_{10} \\frac{m}{d}$", "$log_{10} \\frac{m}{d}$", "$log_{10} \\frac{m}{d}$","$log_{10} \\frac{1}{m}$"]
 
     pst = pyemu.Pst(os.path.join(m_d, pstf+".pst"))
@@ -588,10 +590,23 @@ def plot_histo_pub(m_d, pstf="test_run", log_oe=True,noptmax=None):
 
         grp = obs.loc[name, "obgnme"]
 
-        ax.hist(pr_oe.loc[:,name],fc="0.5",ec="none",alpha=0.3,label="prior ensemble")
-        ax.hist(pt_oe.loc[:, name], fc="b", ec="none", alpha=0.3,label="posterior ensemble")
+        ax.hist(pr_oe.loc[:,name],fc="0.5",ec="none",alpha=0.3,label="prior ensemble",density=True)
+        #xmn,xmx = pr_oe.loc[:,name].min(),pr_oe.loc[:,name].max()
+        #x = np.linspace(xmn,xmx,100)
+        #kde = stats.gaussian_kde(pr_oe.loc[:,name].values)
+        #y = kde.evaluate(x)
+        #ax.fill_between(x,0,y,facecolor="0.5",alpha=0.5,label="prior ensemble")
+        ax.hist(pt_oe.loc[:, name], fc="b", ec="none", alpha=0.3,label="posterior ensemble",density=True)
+        #x = np.linspace(xmn,xmx,100)
+        #kde = stats.gaussian_kde(pt_oe.loc[:,name].values)
+        #y = kde.evaluate(x)
+        #ax.fill_between(x,0,y,facecolor="b",alpha=0.5,label="prior ensemble")
         if log_noise.loc[:,name].var() > 1e-12 and not "less" in grp and not "great" in grp:
-            ax.hist(log_noise.loc[:,name],fc="r",ec="none",alpha=0.3,label="noise ensemble")
+            ax.hist(log_noise.loc[:,name],fc="r",ec="none",alpha=0.3,label="noise ensemble",density=True)
+            #x = np.linspace(xmn,xmx,100)
+            #kde = stats.gaussian_kde(log_noise.loc[:,name].values)
+            #y = kde.evaluate(x)
+            #ax.fill_between(x,0,y,facecolor="r",alpha=0.5,label="prior ensemble")
         v = obs.loc[name,"obsval"]
         ylim = ax.get_ylim()
         ax.plot([v,v],ylim,"r-",lw=2,label="datum")
@@ -688,7 +703,7 @@ def plot_results_pub(m_d, ardim=None, pstf="test_run", log_oe=True,noptmax=None)
     ax_count = 0
     with PdfPages("results_pub_si.pdf") as pdf:
         for oname in onames:
-            fig, axes = plt.subplots(2, 2, figsize=(8.4,11))
+            fig, axes = plt.subplots(2, 3, figsize=(11,8.4))
             # cheating to get layer from oname
             #if "klayer3" not in oname and "klayer1" not in oname and "sslayer1" not in oname:
             #    continue
@@ -724,14 +739,14 @@ def plot_results_pub(m_d, ardim=None, pstf="test_run", log_oe=True,noptmax=None)
             pt_arr[ib[k] <= 0] = np.NaN
             mn, mx = min(np.nanmin(pr_arr), np.nanmin(pt_arr)), max(np.nanmax(pr_arr), np.nanmax(pt_arr))
             irow = 0
-            cb = axes[irow,0].imshow(pr_arr, vmin=mn, vmax=mx)
-            plt.colorbar(cb, ax=axes[irow,0],label="$log_{10}$")
-            cb = axes[irow,1].imshow(pt_arr, vmin=mn, vmax=mx)
-            plt.colorbar(cb, ax=axes[irow,1],label="$log_{10}$")
+            cb = axes[0,irow].imshow(pr_arr, vmin=mn, vmax=mx)
+            plt.colorbar(cb, ax=axes[0,irow],label="$log_{10}$")
+            cb = axes[1,irow].imshow(pt_arr, vmin=mn, vmax=mx)
+            plt.colorbar(cb, ax=axes[1,irow],label="$log_{10}$")
             grp = oobs.obgnme.iloc[0]
-            axes[irow,0].set_title("{0}) prior $\\sigma$ ".format(ax_count) + namer(grp), loc="left")
+            axes[0,irow].set_title("{0}) prior $\\sigma$ ".format(ax_count) + namer(grp), loc="left")
             ax_count += 1
-            axes[irow,1].set_title("{0}) posterior $\\sigma$ ".format(ax_count) + namer(grp), loc="left")
+            axes[1,irow].set_title("{0}) posterior $\\sigma$ ".format(ax_count) + namer(grp), loc="left")
             ax_count += 1
             #for ax in axes.flatten():
                 #ax.imshow(nz_arr, vmin=mn, vmax=mx)
@@ -741,11 +756,11 @@ def plot_results_pub(m_d, ardim=None, pstf="test_run", log_oe=True,noptmax=None)
                 ineqobs = nzobs.loc[nzobs.obgnme.str.contains("greater"), :]
                 # axes[0].scatter(nzobs.j,nzobs.i,marker=".",s=500,facecolor="none",edgecolor="r")
                 # axes[1].scatter(nzobs.j, nzobs.i, marker=".", s=500, facecolor="none", edgecolor="r")
-                axes[irow,0].scatter(ineqobs.j, ineqobs.i, marker=".", s=500, facecolor="none", edgecolor="r")
-                axes[irow,1].scatter(ineqobs.j, ineqobs.i, marker=".", s=500, facecolor="none", edgecolor="r")
+                axes[0,irow].scatter(ineqobs.j, ineqobs.i, marker=".", s=500, facecolor="none", edgecolor="r")
+                axes[1,irow].scatter(ineqobs.j, ineqobs.i, marker=".", s=500, facecolor="none", edgecolor="r")
                 eqobs = nzobs.loc[nzobs.obgnme.apply(lambda x: "greater" not in x), :]
-                axes[irow,0].scatter(eqobs.j, eqobs.i, marker="^", s=100, facecolor="none", edgecolor="r")
-                axes[irow,1].scatter(eqobs.j, eqobs.i, marker="^", s=100, facecolor="none", edgecolor="r")
+                axes[0,irow].scatter(eqobs.j, eqobs.i, marker="^", s=100, facecolor="none", edgecolor="r")
+                axes[1,irow].scatter(eqobs.j, eqobs.i, marker="^", s=100, facecolor="none", edgecolor="r")
 
                 # ens max std for group
                 mx_res = np.max([pr_oe.loc[:, nzobs.obsnme].std(),
@@ -756,18 +771,19 @@ def plot_results_pub(m_d, ardim=None, pstf="test_run", log_oe=True,noptmax=None)
                     ptval = pt_arr[i, j]
                     val = noise.loc[:, name].std()
                     fc, tc = _get_annotation_colors(prval, cmap='BuGn', norm=norm)
-                    axes[irow,0].annotate("{0:2.2f}\n{1:2.2f}".format(val, prval), (j, i), xytext=(5, 5),
+                    axes[0,irow].annotate("{0:2.2f}\n{1:2.2f}".format(val, prval), (j, i), xytext=(5, 5),
                                 textcoords="offset points", va="bottom", ha="left", color=tc,
                                 bbox=dict(boxstyle='round', facecolor=fc, alpha=1.0))
                     fc, tc = _get_annotation_colors(ptval, cmap='BuGn', norm=norm)
-                    axes[irow,1].annotate("{0:2.2f}\n{1:2.2f}".format(val, ptval), (j, i), xytext=(5, 5),
+                    axes[1,irow].annotate("{0:2.2f}\n{1:2.2f}".format(val, ptval), (j, i), xytext=(5, 5),
                                      textcoords="offset points", va="bottom", ha="left", color=tc,
                                      bbox=dict(boxstyle='round', facecolor=fc, alpha=1.0))
 
 
             # a few reals
             irow = 1
-            for idx in pt_oe.index.values[5:6]:
+            for idx in [pt_oe.index.values[5],pt_oe.index.values[105]]:
+                print(idx,grp)
                 #nz_arr = np.zeros((nrow, ncol))
                 #nz_arr[nzobs.i, nzobs.j] = noise.loc[idx,nzobs.obsnme].values
                 #nz_arr[nz_arr == 0] = np.NaN
@@ -779,28 +795,28 @@ def plot_results_pub(m_d, ardim=None, pstf="test_run", log_oe=True,noptmax=None)
                 pr_arr[ib[k] <= 0] = np.NaN
                 pt_arr[ib[k] <= 0] = np.NaN
                 mn, mx = min(np.nanmin(pr_arr), np.nanmin(pt_arr)), max(np.nanmax(pr_arr), np.nanmax(pt_arr))
-                cb = axes[irow,0].imshow(pr_arr, vmin=mn, vmax=mx)
-                plt.colorbar(cb, ax=axes[irow,0],label="$log_{10}$")
-                cb = axes[irow,1].imshow(pt_arr, vmin=mn, vmax=mx)
-                plt.colorbar(cb, ax=axes[irow,1],label="$log_{10}$")
+                cb = axes[0,irow].imshow(pr_arr, vmin=mn, vmax=mx)
+                plt.colorbar(cb, ax=axes[0,irow],label="$log_{10}$")
+                cb = axes[1,irow].imshow(pt_arr, vmin=mn, vmax=mx)
+                plt.colorbar(cb, ax=axes[1,irow],label="$log_{10}$")
 
-                axes[irow,0].set_title("{2}) prior realization {0} {1} ".format(idx,namer(grp),ax_count), loc="left")
+                axes[0,irow].set_title("{2}) prior realization {0}\n{1} ".format(idx,namer(grp),ax_count), loc="left")
                 ax_count += 1
-                axes[irow,1].set_title("{2}) posterior realization {0} {1}".format(idx,namer(grp),ax_count), loc="left")
+                axes[1,irow].set_title("{2}) posterior realization {0}\n{1}".format(idx,namer(grp),ax_count), loc="left")
                 ax_count += 1
                 #for ax in axes.flatten():
                     # ax.imshow(nz_arr,vmin=mn,vmax=mx)
                 if scatter:
                     # axes[0].scatter(nzobs.j, nzobs.i, marker=".", s=500, facecolor="none", edgecolor="r")
                     # axes[1].scatter(nzobs.j, nzobs.i, marker=".", s=500, facecolor="none", edgecolor="r")
-                    ineqobs = nzobs.loc[nzobs.obgnme.str.contains("greater"), :]
+                    ineqobs = nzobs.loc[nzobs.obgnme.apply(lambda x: "greater" in x or "less" in x), :]
                     # axes[0].scatter(nzobs.j,nzobs.i,marker=".",s=500,facecolor="none",edgecolor="r")
                     # axes[1].scatter(nzobs.j, nzobs.i, marker=".", s=500, facecolor="none", edgecolor="r")
-                    axes[irow,0].scatter(ineqobs.j, ineqobs.i, marker=".", s=500, facecolor="none", edgecolor="r")
-                    axes[irow,1].scatter(ineqobs.j, ineqobs.i, marker=".", s=500, facecolor="none", edgecolor="r")
-                    eqobs = nzobs.loc[nzobs.obgnme.apply(lambda x: "greater" not in x), :]
-                    axes[irow,0].scatter(eqobs.j, eqobs.i, marker="^", s=100, facecolor="none", edgecolor="r")
-                    axes[irow,1].scatter(eqobs.j, eqobs.i, marker="^", s=100, facecolor="none", edgecolor="r")
+                    axes[0,irow].scatter(ineqobs.j, ineqobs.i, marker=".", s=500, facecolor="none", edgecolor="r")
+                    axes[1,irow].scatter(ineqobs.j, ineqobs.i, marker=".", s=500, facecolor="none", edgecolor="r")
+                    eqobs = nzobs.loc[nzobs.obgnme.apply(lambda x: "greater" not in x and "less" not in x), :]
+                    axes[0,irow].scatter(eqobs.j, eqobs.i, marker="^", s=100, facecolor="none", edgecolor="r")
+                    axes[1,irow].scatter(eqobs.j, eqobs.i, marker="^", s=100, facecolor="none", edgecolor="r")
 
                     # ens max residual for group
                     tmp_df = pd.concat([nzobs, dups])
@@ -824,27 +840,28 @@ def plot_results_pub(m_d, ardim=None, pstf="test_run", log_oe=True,noptmax=None)
                     mx_res = tmp_df[['pr_res', "pt_res"]].abs().values.max()
                     norm = colors.CenteredNorm(0, mx_res)
                     for i, j, name in zip(nzobs.i, nzobs.j, nzobs.obsnme):
-                        grp = obs.loc[name, "obgnme"]
+                        ggrp = obs.loc[name, "obgnme"]
                         dname = name.replace("oname:", "oname:dup-")
-                        print(name,dname,dname in obs.index)
+                        #print(name,dname,dname in obs.index)
                         if dname in obs.index and obs.loc[dname, "weight"] > 0:
                             lb = "{0:2.2f}".format(obs.loc[dname, "obsval"])
                             ub = "{0:2.2f}".format(nzobs.loc[name, "obsval"])
                             valstr = "{0}<>{1}".format(lb, ub)
                         else:
                             valstr = "{0:2.2f}".format(noise.loc[idx, name])
-                            if "less" in grp:
+                            if "less" in ggrp:
                                 valstr = "<{0:2.2f}".format(obs.loc[name, "obsval"])
-                            elif "great" in grp:
+                            elif "great" in ggrp:
                                 valstr = ">{0:2.2f}".format(obs.loc[name, "obsval"])
                         fc, tc = _get_annotation_colors(tmp_df.pr_res[name], norm=norm)
-                        axes[irow,0].annotate("{0}\n{1:2.2f}".format(valstr, pr_arr[i,j]), (j, i), xytext=(5, 5),
+                        axes[0,irow].annotate("{0}\n{1:2.2f}".format(valstr, pr_arr[i,j]), (j, i), xytext=(5, 5),
                                     textcoords="offset points", va="bottom", ha="left", color=tc,
                                     bbox=dict(boxstyle='round', facecolor=fc, alpha=1.0))
                         fc, tc = _get_annotation_colors(tmp_df.pt_res[name], norm=norm)
-                        axes[irow,1].annotate("{0}\n{1:2.2f}".format(valstr, pt_arr[i, j]), (j, i), xytext=(5, 5),
+                        axes[1,irow].annotate("{0}\n{1:2.2f}".format(valstr, pt_arr[i, j]), (j, i), xytext=(5, 5),
                                          textcoords="offset points", va="bottom", ha="left", color=tc,
                                          bbox=dict(boxstyle='round', facecolor=fc, alpha=1.0))
+                irow += 1
             plt.tight_layout()
             pdf.savefig()
             plt.close(fig)
@@ -870,8 +887,8 @@ def plot_par_changes(m_d,noptmax=None):
         for jcol,grp in enumerate(grps):
             gpar = ppar.loc[ppar.pargp==grp,:]
             ax = axes[irow,jcol]
-            ax.hist(pr.loc[:,gpar.parnme].apply(np.log10).values.flatten(),facecolor="0.5",edgecolor="none",alpha=0.5)
-            ax.hist(pt.loc[:, gpar.parnme].apply(np.log10).values.flatten(), facecolor="b", edgecolor="none", alpha=0.5)
+            ax.hist(pr.loc[:,gpar.parnme].apply(np.log10).values.flatten(),facecolor="0.5",edgecolor="none",alpha=0.5,density=True)
+            ax.hist(pt.loc[:, gpar.parnme].apply(np.log10).values.flatten(), facecolor="b", edgecolor="none", alpha=0.5,density=True)
             ax.set_title("{0} {1}".format(namer(pname),tdict[grp.split("_")[-1]]),loc="left")
             ax.set_yticks([])
             #ax.set_xlabel()

@@ -292,8 +292,8 @@ def make_kickass_figs(m_d_c = "master_flow_prior",m_d_f = "master_flow_post",
     titles = ["A) layer 1 groundwater level","B) layer 3 groundwater level","C) headwater exchange flux"]
     labels = ["meters","meters","$\\frac{meters}{day}$"]
     for ax,fore,title,label in zip(axes,[lay1_fore,lay3_fore,hw_fore],titles, labels):
-        ax.hist(oe_pr.loc[:,fore],facecolor="0.5",edgecolor="none",alpha=0.5)
-        ax.hist(oe_pt.loc[:,fore], facecolor="b", edgecolor="none", alpha=0.5)
+        ax.hist(oe_pr.loc[:,fore],facecolor="0.5",edgecolor="none",alpha=0.5,density=True)
+        ax.hist(oe_pt.loc[:,fore], facecolor="b", edgecolor="none", alpha=0.5,density=True)
         ax.set_yticks([])
         ax.set_ylabel("probability density")
         ax.set_xlabel(label)
@@ -527,7 +527,7 @@ def set_obsvals_weights(t_d,double_ineq_ss=True):
     with PdfPages("noise.pdf") as pdf:
         for oname in nzobs.obsnme:
             fig,ax = plt.subplots(1,1)
-            df.loc[:,oname].hist(ax=ax,facecolor="r",alpha=0.5)
+            df.loc[:,oname].hist(ax=ax,facecolor="r",alpha=0.5,density=True)
             ylim = ax.get_ylim()
             ax.plot([nzobs.loc[oname,"obsval"],nzobs.loc[oname,"obsval"]],ylim,"r")
             plt.tight_layout()
@@ -783,54 +783,54 @@ def plot_domain(c_t_d="daily_template_cond",t_d="daily_template"):
 
 def ensemble_stacking_experiment():
 
-    grid_v = pyemu.geostats.ExpVario(contribution=1.0,a=2000,anisotropy=10,bearing=45)
-    grid_gs = pyemu.geostats.GeoStruct(variograms=grid_v)    
-    pp_v = pyemu.geostats.ExpVario(contribution=1.0, a=5000)
-    pp_gs = pyemu.geostats.GeoStruct(variograms=pp_v)
-    t_d = setup_interface("freyberg_daily",num_reals=100,full_interface=False,include_constants=True,grid_gs=grid_gs,pp_gs=pp_gs,dir_suffix="aniso1")
-    plot_mult(t_d,plt_name="mult_aniso1.pdf")
+    # grid_v = pyemu.geostats.ExpVario(contribution=1.0,a=2000,anisotropy=10,bearing=45)
+    # grid_gs = pyemu.geostats.GeoStruct(variograms=grid_v)    
+    # pp_v = pyemu.geostats.ExpVario(contribution=1.0, a=5000)
+    # pp_gs = pyemu.geostats.GeoStruct(variograms=pp_v)
+    # t_d = setup_interface("freyberg_daily",num_reals=100,full_interface=False,include_constants=True,grid_gs=grid_gs,pp_gs=pp_gs,dir_suffix="aniso1")
+    # plot_mult(t_d,plt_name="mult_aniso1.pdf")
 
-    grid_v = pyemu.geostats.ExpVario(contribution=1.0,a=2000,anisotropy=10,bearing=45+90)
-    grid_gs = pyemu.geostats.GeoStruct(variograms=grid_v)    
-    pp_v = pyemu.geostats.ExpVario(contribution=1.0, a=5000)
-    pp_gs = pyemu.geostats.GeoStruct(variograms=pp_v)
-    t_d = setup_interface("freyberg_daily",num_reals=100,full_interface=False,include_constants=True,grid_gs=grid_gs,pp_gs=pp_gs,dir_suffix="aniso2")
-    plot_mult(t_d,plt_name="mult_aniso2.pdf")
+    # grid_v = pyemu.geostats.ExpVario(contribution=1.0,a=2000,anisotropy=10,bearing=45+90)
+    # grid_gs = pyemu.geostats.GeoStruct(variograms=grid_v)    
+    # pp_v = pyemu.geostats.ExpVario(contribution=1.0, a=5000)
+    # pp_gs = pyemu.geostats.GeoStruct(variograms=pp_v)
+    # t_d = setup_interface("freyberg_daily",num_reals=100,full_interface=False,include_constants=True,grid_gs=grid_gs,pp_gs=pp_gs,dir_suffix="aniso2")
+    # plot_mult(t_d,plt_name="mult_aniso2.pdf")
 
-    t_d = setup_interface("freyberg_daily",num_reals=100,full_interface=False,include_constants=True,dir_suffix="base")
-    plot_mult(t_d,plt_name="mult_base.pdf")
+    # t_d = setup_interface("freyberg_daily",num_reals=100,full_interface=False,include_constants=True,dir_suffix="base")
+    # plot_mult(t_d,plt_name="mult_base.pdf")
 
-    # now combine the three prior ensembles into one
+    # # now combine the three prior ensembles into one
 
-    t_d = "daily_aniso1_cond"
-    pst = pyemu.Pst(os.path.join(t_d,"freyberg.pst"))
+    # t_d = "daily_aniso1_cond"
+    # pst = pyemu.Pst(os.path.join(t_d,"freyberg.pst"))
     
-    pe1 = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,"prior.jcb"))
-    t_d = "daily_aniso2_cond"
-    pe2 = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,"prior.jcb"))
+    # pe1 = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,"prior.jcb"))
+    # t_d = "daily_aniso2_cond"
+    # pe2 = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,"prior.jcb"))
     
-    t_d = "daily_base_cond"
-    pe3 = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,"prior.jcb"))
+    # t_d = "daily_base_cond"
+    # pe3 = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,"prior.jcb"))
     
-    df = pd.concat([pe1._df,pe2._df,pe3._df],axis=0)
-    df.index = np.arange(df.shape[0],dtype=int)
+    # df = pd.concat([pe1._df,pe2._df,pe3._df],axis=0)
+    # df.index = np.arange(df.shape[0],dtype=int)
     
-    pyemu.ParameterEnsemble(pst=pst,df=df).to_binary(os.path.join(t_d,"prior_combine.jcb"))
-    pst.pestpp_options["ies_par_en"] = "prior_combine.jcb"
-    pst.pestpp_options["ies_num_reals"] = 300
-    pst.write(os.path.join(t_d,"freyberg.pst"),version=2)
+    # pyemu.ParameterEnsemble(pst=pst,df=df).to_binary(os.path.join(t_d,"prior_combine.jcb"))
+    # pst.pestpp_options["ies_par_en"] = "prior_combine.jcb"
+    # pst.pestpp_options["ies_num_reals"] = 300
+    # pst.write(os.path.join(t_d,"freyberg.pst"),version=2)
     
-    # set the observed values and weights for the equality and inequality observations
-    set_obsvals_weights(t_d)
-    plot_domain(t_d)
+    # # set the observed values and weights for the equality and inequality observations
+    # set_obsvals_weights(t_d)
+    # plot_domain(t_d)
     
-    # setup the localizer matrix
-    build_localizer(t_d)
+    # # setup the localizer matrix
+    # build_localizer(t_d)
 
     # run PESTPP-IES to condition the realizations
-    noptmax = 4
+    noptmax = 3
     cond_m_d = "daily_cond_combine_master"
-    run(t_d,num_workers=20,num_reals=300,noptmax=noptmax,init_lam=-0.1,m_d=cond_m_d)
+    #run(t_d,num_workers=20,num_reals=300,noptmax=noptmax,init_lam=-0.1,m_d=cond_m_d)
     
     #make_kickass_figs()
     processing.plot_results_pub(cond_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
