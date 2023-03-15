@@ -447,17 +447,20 @@ def set_obsvals_weights(t_d,double_ineq_ss=True):
     #set one really low
     #vals[-1] = -2.0
     vals = pst.observation_data.loc[hk_nznames,"obsval"].values + vals
+    vals[vals > 2.2] = 2.2
+    vals[vals < 0.0] = 0.0
+    
     pst.observation_data.loc[hk_nznames, "obsval"] = vals
 
     pst.observation_data.loc[hk_nznames, "lower_bound"] = vals - 2
     pst.observation_data.loc[hk_nznames, "upper_bound"] = vals + 2
     pst.observation_data.loc[hk_nznames, "weight"] = 1.0 + np.cumsum(np.ones(len(hk_nznames))+1)
 
-    vals = pst.observation_data.loc[hk_iq_nznames,"obsval"] - 0.75
+    vals = pst.observation_data.loc[hk_iq_nznames,"obsval"] - 0.5
     pst.observation_data.loc[hk_iq_nznames, "obsval"] = vals
     #pst.observation_data.loc[hk_iq_nzname, "lower_bound"] = val - 1
     #pst.observation_data.loc[hk_iq_nzname, "upper_bound"] = val + 1
-    pst.observation_data.loc[hk_iq_nznames, "weight"] = 10.0
+    pst.observation_data.loc[hk_iq_nznames, "weight"] = 20.0
     pst.observation_data.loc[hk_iq_nznames, "obgnme"] = obs.loc[hk_iq_nznames,"oname"].apply(lambda x: "less_than_"+x)
     
     vals = np.random.normal(1.5, 0.1, len(w_nznames))
@@ -780,42 +783,42 @@ def plot_domain(c_t_d="daily_template_cond",t_d="daily_template"):
 
 def ensemble_stacking_experiment():
 
-    # grid_v = pyemu.geostats.ExpVario(contribution=1.0,a=3000,anisotropy=10,bearing=90)
-    # grid_gs = pyemu.geostats.GeoStruct(variograms=grid_v)    
-    # pp_v = pyemu.geostats.ExpVario(contribution=1.0, a=5000)
-    # pp_gs = pyemu.geostats.GeoStruct(variograms=pp_v)
-    # t_d = setup_interface("freyberg_daily",num_reals=100,full_interface=False,include_constants=True,grid_gs=grid_gs,pp_gs=pp_gs,dir_suffix="aniso1")
-    # plot_mult(t_d,plt_name="mult_aniso1.pdf")
+    grid_v = pyemu.geostats.ExpVario(contribution=1.0,a=2000,anisotropy=10,bearing=45)
+    grid_gs = pyemu.geostats.GeoStruct(variograms=grid_v)    
+    pp_v = pyemu.geostats.ExpVario(contribution=1.0, a=5000)
+    pp_gs = pyemu.geostats.GeoStruct(variograms=pp_v)
+    t_d = setup_interface("freyberg_daily",num_reals=100,full_interface=False,include_constants=True,grid_gs=grid_gs,pp_gs=pp_gs,dir_suffix="aniso1")
+    plot_mult(t_d,plt_name="mult_aniso1.pdf")
 
-    # grid_v = pyemu.geostats.ExpVario(contribution=1.0,a=3000,anisotropy=10,bearing=180)
-    # grid_gs = pyemu.geostats.GeoStruct(variograms=grid_v)    
-    # pp_v = pyemu.geostats.ExpVario(contribution=1.0, a=5000)
-    # pp_gs = pyemu.geostats.GeoStruct(variograms=pp_v)
-    # t_d = setup_interface("freyberg_daily",num_reals=100,full_interface=False,include_constants=True,grid_gs=grid_gs,pp_gs=pp_gs,dir_suffix="aniso2")
-    # plot_mult(t_d,plt_name="mult_aniso2.pdf")
+    grid_v = pyemu.geostats.ExpVario(contribution=1.0,a=2000,anisotropy=10,bearing=45+90)
+    grid_gs = pyemu.geostats.GeoStruct(variograms=grid_v)    
+    pp_v = pyemu.geostats.ExpVario(contribution=1.0, a=5000)
+    pp_gs = pyemu.geostats.GeoStruct(variograms=pp_v)
+    t_d = setup_interface("freyberg_daily",num_reals=100,full_interface=False,include_constants=True,grid_gs=grid_gs,pp_gs=pp_gs,dir_suffix="aniso2")
+    plot_mult(t_d,plt_name="mult_aniso2.pdf")
 
-    #t_d = setup_interface("freyberg_daily",num_reals=100,full_interface=False,include_constants=True,dir_suffix="base")
-    #plot_mult(t_d,plt_name="mult_base.pdf")
+    t_d = setup_interface("freyberg_daily",num_reals=100,full_interface=False,include_constants=True,dir_suffix="base")
+    plot_mult(t_d,plt_name="mult_base.pdf")
 
     # now combine the three prior ensembles into one
 
-    #t_d = "daily_aniso1_cond"
-    #pst = pyemu.Pst(os.path.join(t_d,"freyberg.pst"))
+    t_d = "daily_aniso1_cond"
+    pst = pyemu.Pst(os.path.join(t_d,"freyberg.pst"))
     
-    #pe1 = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,"prior.jcb"))
-    #t_d = "daily_aniso2_cond"
-    #pe2 = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,"prior.jcb"))
+    pe1 = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,"prior.jcb"))
+    t_d = "daily_aniso2_cond"
+    pe2 = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,"prior.jcb"))
     
     t_d = "daily_base_cond"
-    #pe3 = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,"prior.jcb"))
+    pe3 = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,"prior.jcb"))
     
-    #df = pd.concat([pe1._df,pe2._df,pe3._df],axis=0)
-    #df.index = np.arange(df.shape[0],dtype=int)
+    df = pd.concat([pe1._df,pe2._df,pe3._df],axis=0)
+    df.index = np.arange(df.shape[0],dtype=int)
     
-    #pyemu.ParameterEnsemble(pst=pst,df=df).to_binary(os.path.join(t_d,"prior_combine.jcb"))
-    #pst.pestpp_options["ies_par_en"] = "prior_combine.jcb"
-    #pst.pestpp_options["ies_num_reals"] = 300
-    #pst.write(os.path.join(t_d,"freyberg.pst"),version=2)
+    pyemu.ParameterEnsemble(pst=pst,df=df).to_binary(os.path.join(t_d,"prior_combine.jcb"))
+    pst.pestpp_options["ies_par_en"] = "prior_combine.jcb"
+    pst.pestpp_options["ies_num_reals"] = 300
+    pst.write(os.path.join(t_d,"freyberg.pst"),version=2)
     
     # set the observed values and weights for the equality and inequality observations
     set_obsvals_weights(t_d)
@@ -825,9 +828,9 @@ def ensemble_stacking_experiment():
     build_localizer(t_d)
 
     # run PESTPP-IES to condition the realizations
-    noptmax = 3
+    noptmax = 4
     cond_m_d = "daily_cond_combine_master"
-    run(t_d,num_workers=20,num_reals=100,noptmax=noptmax,init_lam=-0.1,m_d=cond_m_d)
+    run(t_d,num_workers=20,num_reals=300,noptmax=noptmax,init_lam=-0.1,m_d=cond_m_d)
     
     #make_kickass_figs()
     processing.plot_results_pub(cond_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
