@@ -844,8 +844,8 @@ def ensemble_stacking_experiment():
 if __name__ == "__main__":
 
 
-    ensemble_stacking_experiment()
-    exit()
+    #ensemble_stacking_experiment()
+    #exit()
 
     # setup the pest interface for conditioning realizations
     setup_interface("freyberg_daily",num_reals=500,full_interface=False,include_constants=True)
