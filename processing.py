@@ -889,7 +889,7 @@ def plot_par_changes(m_d,noptmax=None):
             ax = axes[irow,jcol]
             ax.hist(pr.loc[:,gpar.parnme].apply(np.log10).values.flatten(),facecolor="0.5",edgecolor="none",alpha=0.5,density=True)
             ax.hist(pt.loc[:, gpar.parnme].apply(np.log10).values.flatten(), facecolor="b", edgecolor="none", alpha=0.5,density=True)
-            ax.set_title("{0} {1}".format(namer(pname),tdict[grp.split("_")[-1]]),loc="left")
+            ax.set_title("{0} {1}, {2} parameters".format(namer(pname),tdict[grp.split("_")[-1]],gpar.shape[0]),loc="left")
             ax.set_yticks([])
             #ax.set_xlabel()
     plt.tight_layout()

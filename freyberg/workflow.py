@@ -848,48 +848,48 @@ if __name__ == "__main__":
     #exit()
 
     # setup the pest interface for conditioning realizations
-    setup_interface("freyberg_daily",num_reals=500,full_interface=False,include_constants=True)
-    cond_t_d = "daily_template_cond"
+    # setup_interface("freyberg_daily",num_reals=500,full_interface=False,include_constants=True)
+    # cond_t_d = "daily_template_cond"
     
-    # set the observed values and weights for the equality and inequality observations
-    set_obsvals_weights(cond_t_d)
+    # # set the observed values and weights for the equality and inequality observations
+    # set_obsvals_weights(cond_t_d)
     
 
-    # setup the localizer matrix
-    build_localizer(cond_t_d)
+    # # setup the localizer matrix
+    # build_localizer(cond_t_d)
     
-    # run PESTPP-IES to condition the realizations
-    run(cond_t_d,num_workers=20,num_reals=500,noptmax=6,init_lam=-0.1)
+    # # run PESTPP-IES to condition the realizations
+    # run(cond_t_d,num_workers=20,num_reals=500,noptmax=6,init_lam=-0.1)
     cond_m_d = "daily_master_cond"
     
-    # now setup a corresponding interface that will actually run MODFLOW
-    setup_interface("freyberg_daily",num_reals=500,full_interface=True,include_constants=True)
-    flow_t_d = "daily_template"
+    # # now setup a corresponding interface that will actually run MODFLOW
+    # setup_interface("freyberg_daily",num_reals=500,full_interface=True,include_constants=True)
+    # flow_t_d = "daily_template"
     
-    # transfer the prior realizations from the previous conditioning analysis into the MODFLOW interace template
-    # so that we are using identical realizations
-    transfer_pars(os.path.join(cond_m_d,"freyberg.pst"),
-                 os.path.join(cond_m_d,"freyberg.0.par.jcb"),
-                 flow_t_d,"cond_prior.jcb")
+    # # transfer the prior realizations from the previous conditioning analysis into the MODFLOW interace template
+    # # so that we are using identical realizations
+    # transfer_pars(os.path.join(cond_m_d,"freyberg.pst"),
+    #              os.path.join(cond_m_d,"freyberg.0.par.jcb"),
+    #              flow_t_d,"cond_prior.jcb")
     
-    # run MODFLOW for the prior realizations
-    run(flow_t_d,num_workers=8,num_reals=100,noptmax=-1,m_d="master_flow_prior")
+    # # run MODFLOW for the prior realizations
+    # run(flow_t_d,num_workers=8,num_reals=100,noptmax=-1,m_d="master_flow_prior")
     
 
-    # now transfer the conditioned realizations into the modflow interface
-    transfer_pars(os.path.join(cond_m_d,"freyberg.pst"),
-                   os.path.join(cond_m_d,"freyberg.6.par.jcb"),
-                   flow_t_d,"cond_post.jcb")
+    # # now transfer the conditioned realizations into the modflow interface
+    # transfer_pars(os.path.join(cond_m_d,"freyberg.pst"),
+    #                os.path.join(cond_m_d,"freyberg.6.par.jcb"),
+    #                flow_t_d,"cond_post.jcb")
 
-    # now run modflow for the conditioned realizations
-    run(flow_t_d,num_workers=8,num_reals=100,noptmax=-1,m_d="master_flow_post")
+    # # now run modflow for the conditioned realizations
+    # run(flow_t_d,num_workers=8,num_reals=100,noptmax=-1,m_d="master_flow_post")
     
     # now make all the figures for the manuscript
-    make_kickass_figs()
-    plot_mult(cond_t_d)
-    plot_domain()
-    processing.plot_results_pub(cond_m_d, pstf="freyberg", log_oe=False,noptmax=6)
-    processing.plot_histo_pub(cond_m_d,pstf="freyberg",log_oe=False,noptmax=6)
-    processing.plot_histo(cond_m_d, pstf="freyberg", log_oe=False, noptmax=6)
+    # make_kickass_figs()
+    # plot_mult(cond_t_d)
+    # plot_domain()
+    # processing.plot_results_pub(cond_m_d, pstf="freyberg", log_oe=False,noptmax=6)
+    # processing.plot_histo_pub(cond_m_d,pstf="freyberg",log_oe=False,noptmax=6)
+    # processing.plot_histo(cond_m_d, pstf="freyberg", log_oe=False, noptmax=6)
     processing.plot_par_changes(cond_m_d)
 
