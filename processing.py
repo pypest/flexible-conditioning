@@ -1,13 +1,13 @@
 import os
 import numpy as np
-import pyemu
-from scipy import stats
+from freyberg import pyemu
+# from scipy import stats
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.colors as colors
 from matplotlib import cm
 import pandas as pd
-import flopy
+from freyberg import flopy
 from string import ascii_uppercase
 
 
@@ -550,14 +550,15 @@ def plot_histo(m_d, pstf="test_run", log_oe=True,noptmax=None):
             plt.close(fig)
 
 
-def plot_histo_pub(m_d, pstf="test_run", log_oe=True,noptmax=None):
+def plot_histo_pub(m_d, pstf="test_run", log_oe=True, noptmax=None,
+                   ineqfill=True):
 
     # names = ["oname:stosslayer3_otype:arr_i:8_j:47","oname:npfklayer1_otype:arr_i:101_j:23","oname:npfklayer3_otype:arr_i:8_j:47","oname:npfklayer3_otype:arr_i:79_j:31"]
     # units = ["$log_{10} \\frac{1}{m}$","$log_{10} \\frac{m}{d}$","$log_{10} \\frac{m}{d}$","$log_{10} \\frac{m}{d}$"]
 
-    names = ["oname:npfklayer3_otype:arr_i:8_j:47","oname:npfklayer1_otype:arr_i:101_j:23",
-             "oname:npfklayer3_otype:arr_i:79_j:31","oname:stosslayer1_otype:arr_i:74_j:14"]
-    units = ["$log_{10} \\frac{m}{d}$", "$log_{10} \\frac{m}{d}$", "$log_{10} \\frac{m}{d}$","$log_{10} \\frac{1}{m}$"]
+    names = ["oname:npfklayer3_otype:arr_i:8_j:47", "oname:npfklayer1_otype:arr_i:101_j:23",
+             "oname:npfklayer3_otype:arr_i:79_j:31", "oname:stosslayer1_otype:arr_i:47_j:50"]
+    units = ["$log_{10} \\frac{m}{d}$", "$log_{10} \\frac{m}{d}$", "$log_{10} \\frac{m}{d}$", "$log_{10} \\frac{1}{m}$"]
 
     pst = pyemu.Pst(os.path.join(m_d, pstf+".pst"))
     if noptmax is None:
@@ -591,41 +592,37 @@ def plot_histo_pub(m_d, pstf="test_run", log_oe=True,noptmax=None):
         grp = obs.loc[name, "obgnme"]
 
         ax.hist(pr_oe.loc[:,name],fc="0.5",ec="none",alpha=0.3,label="prior ensemble",density=True)
-        #xmn,xmx = pr_oe.loc[:,name].min(),pr_oe.loc[:,name].max()
-        #x = np.linspace(xmn,xmx,100)
-        #kde = stats.gaussian_kde(pr_oe.loc[:,name].values)
-        #y = kde.evaluate(x)
-        #ax.fill_between(x,0,y,facecolor="0.5",alpha=0.5,label="prior ensemble")
         ax.hist(pt_oe.loc[:, name], fc="b", ec="none", alpha=0.3,label="posterior ensemble",density=True)
-        #x = np.linspace(xmn,xmx,100)
-        #kde = stats.gaussian_kde(pt_oe.loc[:,name].values)
-        #y = kde.evaluate(x)
-        #ax.fill_between(x,0,y,facecolor="b",alpha=0.5,label="prior ensemble")
         if log_noise.loc[:,name].var() > 1e-12 and not "less" in grp and not "great" in grp:
             ax.hist(log_noise.loc[:,name],fc="r",ec="none",alpha=0.3,label="noise ensemble",density=True)
-            #x = np.linspace(xmn,xmx,100)
-            #kde = stats.gaussian_kde(log_noise.loc[:,name].values)
-            #y = kde.evaluate(x)
-            #ax.fill_between(x,0,y,facecolor="r",alpha=0.5,label="prior ensemble")
         v = obs.loc[name,"obsval"]
         ylim = ax.get_ylim()
-        ax.plot([v,v],ylim,"r-",lw=2,label="datum")
+        ax.plot([v,v],ylim,"r-",lw=2,label="datum", zorder=10)
         dname = name.replace("oname:","oname:dup-")
         tag = ""
         if dname in pst.nnz_obs_names:
+            v0 = v
             v = obs.loc[dname, "obsval"]
-            ylim = ax.get_ylim()
             ax.plot([v, v], ylim, "r-", lw=2)
             tag = ", double inequality"
+            if ineqfill:
+                xs = (v0, v)
+                ax.fill_between(xs, ylim[0], ylim[1], facecolor="r", alpha=0.3, zorder=9)
         ax.set_yticklabels([])
-        i,j = obs.loc[name,"i"],obs.loc[name,"j"]
-
-
+        xlim = ax.get_xlim()
 
         if len(tag) == 0 and "less" in grp:
             tag += ", less-than inequality"
+            if ineqfill:
+                xs = (xlim[0], v)
+                ax.fill_between(xs, ylim[0], ylim[1], facecolor="r", alpha=0.3, zorder=9)
         elif len(tag) == 0 and "great" in grp:
             tag += ", greater-than inequality"
+            if ineqfill:
+                xs = (v, xlim[1])
+                ax.fill_between(xs, ylim[0], ylim[1], facecolor="r", alpha=0.3, zorder=9)
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
         ax.set_xlabel(units[ax_count])
         ax.set_yticks([])
         ax.set_title("{2}) {0} {1}".format(namer(name),tag,ascii_uppercase[ax_count]),loc="left")
@@ -796,9 +793,9 @@ def plot_results_pub(m_d, ardim=None, pstf="test_run", log_oe=True,noptmax=None)
                 pt_arr[ib[k] <= 0] = np.NaN
                 mn, mx = min(np.nanmin(pr_arr), np.nanmin(pt_arr)), max(np.nanmax(pr_arr), np.nanmax(pt_arr))
                 cb = axes[0,irow].imshow(pr_arr, vmin=mn, vmax=mx)
-                plt.colorbar(cb, ax=axes[0,irow],label="$log_{10}$")
+                cbar0 = plt.colorbar(cb, ax=axes[0,irow],label="$log_{10}$")
                 cb = axes[1,irow].imshow(pt_arr, vmin=mn, vmax=mx)
-                plt.colorbar(cb, ax=axes[1,irow],label="$log_{10}$")
+                cbar1 = plt.colorbar(cb, ax=axes[1,irow],label="$log_{10}$")
 
                 axes[0,irow].set_title("{2}) prior realization {0}\n{1} ".format(idx,namer(grp),ax_count), loc="left")
                 ax_count += 1
@@ -807,6 +804,8 @@ def plot_results_pub(m_d, ardim=None, pstf="test_run", log_oe=True,noptmax=None)
                 #for ax in axes.flatten():
                     # ax.imshow(nz_arr,vmin=mn,vmax=mx)
                 if scatter:
+                    cbar0.ax.zorder = -1
+                    cbar1.ax.zorder = -1
                     # axes[0].scatter(nzobs.j, nzobs.i, marker=".", s=500, facecolor="none", edgecolor="r")
                     # axes[1].scatter(nzobs.j, nzobs.i, marker=".", s=500, facecolor="none", edgecolor="r")
                     ineqobs = nzobs.loc[nzobs.obgnme.apply(lambda x: "greater" in x or "less" in x), :]
@@ -873,7 +872,8 @@ def plot_par_changes(m_d,noptmax=None):
         noptmax = pst.control_data.noptmax
     pr = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(m_d,"freyberg.0.par.jcb"))
     pt = pyemu.ParameterEnsemble.from_binary(pst=pst, filename=os.path.join(m_d, "freyberg.{0}.par.jcb".format(noptmax)))
-    pt = pt.loc[pr.index,:]
+    commonidx = pr.index.intersection(pt.index)
+    pt = pt.loc[commonidx, :]
 
     par = pst.parameter_data
     pnames = par.pname.unique()
