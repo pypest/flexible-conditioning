@@ -185,14 +185,15 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
             #                  pp_space=int(5 * redis_fac),geostruct=pp_gs)
             pppdf = ppdf.copy()
             base = arr_file.split('.')[1].replace("_","")+"_"
-            pppdf.loc[:,"name"] = [base+n for n in pppdf.name.values]
+            pppdf.loc[:,"name"] = [base+n for n in pppdf.ppname.values]
             pppdf.index = pppdf.name.values
             pp_file = os.path.join(pf.new_d,base+"pp.csv")
             pppdf.to_csv(pp_file,index=False)
             pp_files.append(os.path.split(pp_file)[1])
             mod_files.append(arr_file)
-            pf.add_parameters(os.path.split(pp_file)[1],par_type="grid",index_cols=["name"],use_cols=["value","bearing"],
-                par_name_base=["","bearing"],pargp=["pp","bearing"],upper_bound=[ub,60],lower_bound=[lb,20])
+            pf.add_parameters(os.path.split(pp_file)[1],par_type="grid",index_cols=["ppname"],use_cols=["value","bearing"],
+                par_name_base=["","bearing"],pargp=["pp","bearing"],upper_bound=[ub,90],lower_bound=[lb,20],
+                par_style="direct",transform="log")
             if include_constants:
                 pf.add_parameters(filenames=arr_file, par_type="constant",
                                   par_name_base=arr_file.split('.')[1].replace("_", "") + "_cn",
@@ -308,11 +309,12 @@ def apply_pps():
         org_arr = np.loadtxt(model_file)
         interp = interp.reshape(org_arr.shape)
         new_arr = org_arr * interp
+        new_arr[new_arr<1.0e-10] = 1.0e-10
         np.savetxt(model_file,new_arr,fmt="%15.6E")
         np.savetxt("interp_"+model_file,interp,fmt="%15.6E")
     
 
-def run(t_d,num_workers=5,num_reals=100,noptmax=-1,m_d=None,init_lam=None,mm_alpha=None):
+def run(t_d,num_workers=5,num_reals=100,noptmax=-1,m_d=None,init_lam=None,mm_alpha=None,**kwargs):
     if m_d is None:
         m_d = t_d.replace("template","master")
     pst = pyemu.Pst(os.path.join(t_d,"freyberg.pst"))
@@ -324,6 +326,8 @@ def run(t_d,num_workers=5,num_reals=100,noptmax=-1,m_d=None,init_lam=None,mm_alp
     pst.pestpp_options["ies_subset_size"] = -10
     if mm_alpha is not None:
         pst.pestpp_options["ies_multimodal_alpha"] = 0.15
+    for k,v in kwargs.items():
+        pst.pestpp_options[k] = v
     #pst.pestpp_options["ies_num_threads"] = 6
     pst.write(os.path.join(t_d,"freyberg.pst"),version=2)
     pyemu.os_utils.start_workers(t_d,"pestpp-ies","freyberg.pst",
@@ -925,6 +929,7 @@ def ensemble_stacking_experiment():
         shutil.copy2(pdf,new_pdf)
 
 
+
 if __name__ == "__main__":
 
 
@@ -932,8 +937,15 @@ if __name__ == "__main__":
     #exit()
 
     # setup the pest interface for conditioning realizations
-    setup_interface("freyberg_daily",num_reals=100,full_interface=False,include_constants=True,
-        binary_pe=False)
+    setup_interface("freyberg_daily",num_reals=100,full_interface=True,include_constants=True,
+        binary_pe=True)
+    
+    # run for truth...
+    full_t_d = "daily_template"
+    truth_m_d = "daily_truth_prior_master"
+    run(full_t_d,num_workers=5,num_reals=100,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
+    
+
     exit()
     cond_t_d = "daily_template_cond"
     
