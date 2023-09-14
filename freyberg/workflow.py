@@ -51,7 +51,7 @@ else:
 
 
 def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=True,
-    grid_gs=None,pp_gs=None, dir_suffix="template",binary_pe=True):
+    grid_gs=None,pp_gs=None, dir_suffix="template",binary_pe=True, ppu_dir=os.path.join("..","..","..","pypestutils")):
 
     if os.path.exists(os.path.join(org_ws, mf_exe)):
         os.remove(os.path.join(org_ws, mf_exe))
@@ -66,6 +66,27 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
         shutil.rmtree(os.path.join(org_ws, "flopy"),ignore_errors=True)
     shutil.copytree("flopy", os.path.join(org_ws, "flopy"))
 
+    if os.path.exists(os.path.join(org_ws, "pypestutils")):
+        shutil.rmtree(os.path.join(org_ws, "pypestutils"),ignore_errors=True)
+
+    shutil.copytree(os.path.join(ppu_dir,"pypestutils"), os.path.join(org_ws, "pypestutils"))
+
+    if os.path.exists(os.path.join("pypestutils")):
+        shutil.rmtree(os.path.join("pypestutils"),ignore_errors=True)
+
+    shutil.copytree(os.path.join(ppu_dir,"pypestutils"), os.path.join("pypestutils"))
+
+    
+
+
+
+    # check that pypestutils is working
+    from pypestutils.pestutilslib import PestUtilsLib
+    lib = PestUtilsLib()
+    lib.initialize_randgen(1234)
+    from pypestutils import helpers as ppu
+
+    
     # load the mf6 model with flopy to get the spatial reference
     sim = flopy.mf6.MFSimulation.load(sim_ws=org_ws)
     m = sim.get_model("freyberg6")
@@ -94,9 +115,22 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
         grid_gs = pyemu.geostats.GeoStruct(variograms=grid_v)
 
     # the geostruct object for pilot-point-scale parameters
-    if pp_gs is None:
-        pp_v = pyemu.geostats.ExpVario(contribution=1.0, a=3000)
-        pp_gs = pyemu.geostats.GeoStruct(variograms=pp_v)
+    # if pp_gs is None:
+    #     pp_v = pyemu.geostats.ExpVario(contribution=1.0, a=3000)
+    #     pp_gs = pyemu.geostats.GeoStruct(variograms=pp_v)
+
+    # use the idomain array for masking parameter locations
+    ib = m.dis.idomain[0].array
+
+    sr = ppu.SpatialReference(delr=m.dis.delr.array,delc=m.dis.delc.array,xul=0,yul=np.cumsum(m.dis.delc.array)[-1])
+    grid_fname = os.path.join(pf.new_d,"grid.spc")
+    sr.write_gridspec(grid_fname)
+    ppdf = ppu.get_2d_pp_info_structured_grid(4,grid_fname)
+    ppdf.loc[:,"value"] = 1.0
+    ppdf.loc[:,"bearing"] = 45
+    ppdf.loc[:,"aniso"] = 10
+    print("{0} pilot points".format(ppdf.shape[0]))
+
 
     # the geostruct for recharge grid-scale parameters
     rch_v = pyemu.geostats.ExpVario(contribution=1.0, a=1000)
@@ -108,8 +142,7 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
     # import flopy as part of the forward run process
     pf.extra_py_imports.append('flopy')
 
-    # use the idomain array for masking parameter locations
-    ib = m.dis.idomain[0].array
+    
     
     # define a dict that contains file name tags and lower/upper bound information
     #tags = {"npf_k_":[0.1,10.],"npf_k33_":[.1,10],"sto_ss":[.1,10],"sto_sy":[.9,1.1]}#,
@@ -118,6 +151,7 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
     dts = pd.to_datetime("1-1-2018") + \
           pd.to_timedelta(np.cumsum(sim.tdis.perioddata.array["perlen"]),unit="d")
 
+    pp_files,mod_files = [],[]
     # loop over each tag, bound info pair
     for tag,bnd in tags.items():
         if not full_interface and "_k_" not in tag and "_ss" not in tag and "_sy" not in tag and "k33" not in tag:
@@ -138,6 +172,7 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
         
         
         # for each array add both grid-scale and pilot-point scale parameters
+        
         for arr_file in arr_files:
             if ("sy" in arr_file and
                     int(arr_file.strip(".txt").split('layer')[-1]) > 1):
@@ -145,9 +180,19 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
             pf.add_parameters(filenames=arr_file,par_type="grid",par_name_base=arr_file.split('.')[1].replace("_","")+"_gr",
                               pargp=arr_file.split('.')[1].replace("_","")+"_gr",zone_array=ib,upper_bound=ub,lower_bound=lb,
                               geostruct=grid_gs)
-            pf.add_parameters(filenames=arr_file, par_type="pilotpoints", par_name_base=arr_file.split('.')[1].replace("_","")+"_pp",
-                              pargp=arr_file.split('.')[1].replace("_","")+"_pp", zone_array=ib,upper_bound=ub,lower_bound=lb,
-                              pp_space=int(5 * redis_fac),geostruct=pp_gs)
+            #pf.add_parameters(filenames=arr_file, par_type="pilotpoints", par_name_base=arr_file.split('.')[1].replace("_","")+"_pp",
+            #                  pargp=arr_file.split('.')[1].replace("_","")+"_pp", zone_array=ib,upper_bound=ub,lower_bound=lb,
+            #                  pp_space=int(5 * redis_fac),geostruct=pp_gs)
+            pppdf = ppdf.copy()
+            base = arr_file.split('.')[1].replace("_","")+"_"
+            pppdf.loc[:,"name"] = [base+n for n in pppdf.name.values]
+            pppdf.index = pppdf.name.values
+            pp_file = os.path.join(pf.new_d,base+"pp.csv")
+            pppdf.to_csv(pp_file,index=False)
+            pp_files.append(os.path.split(pp_file)[1])
+            mod_files.append(arr_file)
+            pf.add_parameters(os.path.split(pp_file)[1],par_type="grid",index_cols=["name"],use_cols=["value","bearing"],
+                par_name_base=["","bearing"],pargp=["pp","bearing"],upper_bound=[ub,60],lower_bound=[lb,20])
             if include_constants:
                 pf.add_parameters(filenames=arr_file, par_type="constant",
                                   par_name_base=arr_file.split('.')[1].replace("_", "") + "_cn",
@@ -191,6 +236,11 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
     pf.add_py_function("workflow.py",
                        call_str="log_array_files()",
                        is_pre_cmd=False)
+
+    df = pd.DataFrame({"model_file":mod_files,"pp_file":pp_files})
+    df.to_csv(os.path.join(pf.new_d,"pp_info.csv"))
+    setup_pps(pf.new_d)
+    pf.add_py_function("workflow.py",call_str="apply_pps()",is_pre_cmd=True)
     # build pest control file
     pst = pf.build_pst('freyberg.pst')
     shutil.copy2(os.path.join(exe_dir, pst_exe),
@@ -238,6 +288,29 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
     #assert pst.phi < 1.0e-5, pst.phi
     return pf.new_d
 
+
+def setup_pps(d):
+    cwd = os.getcwd()
+    os.chdir(d)
+    apply_pps()
+    os.chdir(cwd)
+
+
+def apply_pps():
+    
+    from pypestutils import helpers
+    import pandas as pd
+    df = pd.read_csv("pp_info.csv")
+    gridspec_fname = "grid.spc"
+    for model_file,pp_file in zip(df.model_file,df.pp_file):
+        ppdf = pd.read_csv(pp_file)
+        interp = helpers.interpolate_with_sva_pilotpoints_2d(ppdf,gridspec_fname)
+        org_arr = np.loadtxt(model_file)
+        interp = interp.reshape(org_arr.shape)
+        new_arr = org_arr * interp
+        np.savetxt(model_file,new_arr,fmt="%15.6E")
+        np.savetxt("interp_"+model_file,interp,fmt="%15.6E")
+    
 
 def run(t_d,num_workers=5,num_reals=100,noptmax=-1,m_d=None,init_lam=None,mm_alpha=None):
     if m_d is None:
@@ -581,6 +654,7 @@ def plot_fields(m_d):
 
 def log_array_files(d='.'):
     mult_df = pd.read_csv(os.path.join(d, "mult2model_info.csv"), index_col=0)
+    mult_df = mult_df.loc[pd.isna(mult_df.index_cols),:]
     for f in mult_df.model_file.unique():
         ar = np.loadtxt(os.path.join(d, f))
         np.savetxt(os.path.join(d, f"log_{f}"), np.log10(ar))
@@ -858,9 +932,9 @@ if __name__ == "__main__":
     #exit()
 
     # setup the pest interface for conditioning realizations
-    setup_interface("freyberg_daily",num_reals=1000000,full_interface=False,include_constants=True,
+    setup_interface("freyberg_daily",num_reals=100,full_interface=False,include_constants=True,
         binary_pe=False)
-    
+    exit()
     cond_t_d = "daily_template_cond"
     
     # set the observed values and weights for the equality and inequality observations
