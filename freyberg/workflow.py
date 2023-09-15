@@ -1017,18 +1017,18 @@ def daily_to_monthly(daily_d="freyberg_daily",monthly_d="freyberg_monthly"):
 if __name__ == "__main__":
 
 
-    daily_to_monthly()
-    exit()
+    #daily_to_monthly()
+    #exit()
 
 
     #ensemble_stacking_experiment()
     #exit()
 
     #setup the pest interface for conditioning realizations
-    setup_interface("freyberg_daily",num_reals=100,full_interface=True,include_constants=True,
+    setup_interface("freyberg_monthly",num_reals=100,full_interface=True,include_constants=True,
        binary_pe=True)
     
-    run_a_real("daily_template")
+    run_a_real("monthly_template")
     exit()
     # run for truth...
     full_t_d = "daily_template"
