@@ -115,9 +115,9 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
         grid_gs = pyemu.geostats.GeoStruct(variograms=grid_v)
 
     # the geostruct object for pilot-point-scale parameters
-    # if pp_gs is None:
-    #     pp_v = pyemu.geostats.ExpVario(contribution=1.0, a=3000)
-    #     pp_gs = pyemu.geostats.GeoStruct(variograms=pp_v)
+    if pp_gs is None:
+        pp_v = pyemu.geostats.ExpVario(contribution=1.0, a=3000)
+        pp_gs = pyemu.geostats.GeoStruct(variograms=pp_v)
 
     # use the idomain array for masking parameter locations
     ib = m.dis.idomain[0].array
@@ -125,10 +125,11 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
     sr = ppu.SpatialReference(delr=m.dis.delr.array,delc=m.dis.delc.array,xul=0,yul=np.cumsum(m.dis.delc.array)[-1])
     grid_fname = os.path.join(pf.new_d,"grid.spc")
     sr.write_gridspec(grid_fname)
-    ppdf = ppu.get_2d_pp_info_structured_grid(4,grid_fname)
+    ppdf = ppu.get_2d_pp_info_structured_grid(10,grid_fname)
     ppdf.loc[:,"value"] = 1.0
-    ppdf.loc[:,"bearing"] = 45
+    ppdf.loc[:,"bearing"] = 180
     ppdf.loc[:,"aniso"] = 10
+
     print("{0} pilot points".format(ppdf.shape[0]))
 
 
@@ -191,8 +192,8 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
             pppdf.to_csv(pp_file,index=False)
             pp_files.append(os.path.split(pp_file)[1])
             mod_files.append(arr_file)
-            pf.add_parameters(os.path.split(pp_file)[1],par_type="grid",index_cols=["ppname"],use_cols=["value","bearing"],
-                par_name_base=["","bearing"],pargp=["pp","bearing"],upper_bound=[ub,90],lower_bound=[lb,20],
+            pf.add_parameters(os.path.split(pp_file)[1],par_type="grid",index_cols=["ppname","x","y"],use_cols=["value","bearing"],
+                par_name_base=["","bearing"],pargp=["pp","bearing"],upper_bound=[ub*5,200],lower_bound=[lb/5,160],
                 par_style="direct",transform="log")
             if include_constants:
                 pf.add_parameters(filenames=arr_file, par_type="constant",
@@ -929,17 +930,106 @@ def ensemble_stacking_experiment():
         shutil.copy2(pdf,new_pdf)
 
 
+def run_a_real(t_d):
+    pst = pyemu.Pst(os.path.join(t_d,"freyberg.pst"))
+    pe_fname = pst.pestpp_options["ies_par_en"]
+    if pe_fname.endswith('.jcb'):
+        pe = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,pe_fname))
+    else:
+        pe  = pd.read_csv(os.path.join(t_d,pe_fname),index_col=0)
+    par = pst.parameter_data
+    par.loc[:,"parval1"] = pe.loc[pe.index[0],pst.par_names].values
+    pst_name = "freyberg_{0}.pst".format(pe.index[0])
+    pst.control_data.noptmax = 0
+    pst.write(os.path.join(t_d,pst_name),version=2)
+    pyemu.os_utils.run("pestpp-ies {0}".format(pst_name),cwd=t_d)
 
+    iarr = np.loadtxt(os.path.join(t_d,"interp_freyberg6.npf_k_layer1.txt"))
+    garr = np.loadtxt(os.path.join(t_d,"mult","npfklayer1_gr_inst0_grid.csv"))
+    arr = np.loadtxt(os.path.join(t_d,"freyberg6.npf_k_layer1.txt"))
+
+    fig,axes = plt.subplots(1,3,figsize=(28,10))
+
+    ax = axes[0]
+    cb = ax.imshow(np.log10(garr))
+    plt.colorbar(cb,ax=ax)
+    ax.set_title("grid array")
+
+    ax = axes[1]
+    cb = ax.imshow(np.log10(iarr))
+    plt.colorbar(cb,ax=ax)
+    ax.set_title("pp array")
+
+    ax = axes[2]
+    cb = ax.imshow(np.log10(arr))
+    plt.colorbar(cb,ax=ax)
+    ax.set_title("hk array")
+    plt.show()
+
+
+def daily_to_monthly(daily_d="freyberg_daily",monthly_d="freyberg_monthly"):
+    if os.path.exists(monthly_d):
+        shutil.rmtree(monthly_d)
+    #shutil.copytree(daily_d,monthly_d)
+
+    sim = flopy.mf6.MFSimulation.load(sim_ws=daily_d)
+    m = sim.get_model()
+    rch_data = m.rcha.recharge.array
+    print(rch_data.shape)
+    rch_f_prefix = os.path.join(monthly_d,"freyberg6.rch_recharge_")
+    # efiles = [f for f in os.listdir(monthly_d) if f.startswith(rch_f_prefix)]
+    # for efile in efiles:
+    #     os.remove(os.path.join(monthly_d,efile))
+    new_rch_data = {0:rch_data[0,:,:,:].copy()}
+    spd = m.wel.stress_period_data.array
+    wel_data = spd[0]
+    print(wel_data)
+    print(wel_data.shape)
+    new_wel_data = {0:spd[0]}
+    kper = 1
+    new_tdis_data = {0:(1.,1,1.0)}
+    for i in range(1,(30*24)+1,30):
+        s = i
+        e = i + 30
+        new_arr = rch_data[s:e,:,:,:].mean(axis=0)
+        print(new_arr.shape)
+        new_rch_data[kper] = new_arr
+        fluxes = []
+        for ii in range(s,e):
+            fluxes.append(spd[ii]['q'])
+        flux = np.array(fluxes).mean(axis=0)
+        print(wel_data)
+        wel_data["q"] = flux
+        new_wel_data[kper] = wel_data.copy()
+        print(flux.shape)
+        new_tdis_data[kper] = (30.0,1,1.0)
+        kper += 1
+
+    m.remove_package("rcha")
+    flopy.mf6.ModflowGwfrcha(m,recharge=new_rch_data)
+    m.remove_package("wel")
+    flopy.mf6.ModflowGwfwel(m,stress_period_data=new_wel_data)
+    sim.tdis.perioddata = sim.tdis.perioddata.array[:25]
+    sim.tdis.nper = 25
+    sim.set_sim_path(monthly_d)
+    sim.set_all_data_external(check_data=True)
+    sim.write_simulation()
 if __name__ == "__main__":
+
+
+    daily_to_monthly()
+    exit()
 
 
     #ensemble_stacking_experiment()
     #exit()
 
-    # setup the pest interface for conditioning realizations
+    #setup the pest interface for conditioning realizations
     setup_interface("freyberg_daily",num_reals=100,full_interface=True,include_constants=True,
-        binary_pe=True)
+       binary_pe=True)
     
+    run_a_real("daily_template")
+    exit()
     # run for truth...
     full_t_d = "daily_template"
     truth_m_d = "daily_truth_prior_master"
