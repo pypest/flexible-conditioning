@@ -116,7 +116,7 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
 
     # the geostruct object for pilot-point-scale parameters
     if pp_gs is None:
-        pp_v = pyemu.geostats.ExpVario(contribution=1.0, a=3000)
+        pp_v = pyemu.geostats.ExpVario(contribution=1.0, a=5000)
         pp_gs = pyemu.geostats.GeoStruct(variograms=pp_v)
 
     # use the idomain array for masking parameter locations
@@ -129,6 +129,9 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
     ppdf.loc[:,"value"] = 1.0
     ppdf.loc[:,"bearing"] = 180
     ppdf.loc[:,"aniso"] = 10
+    ppdf.loc[:,"x"] = np.round(ppdf.x.values,1)
+    ppdf.loc[:,"y"] = np.round(ppdf.y.values,1)
+
 
     print("{0} pilot points".format(ppdf.shape[0]))
 
@@ -153,6 +156,7 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
           pd.to_timedelta(np.cumsum(sim.tdis.perioddata.array["perlen"]),unit="d")
 
     pp_files,mod_files = [],[]
+    bearing_dfs = []
     # loop over each tag, bound info pair
     for tag,bnd in tags.items():
         if not full_interface and "_k_" not in tag and "_ss" not in tag and "_sy" not in tag and "k33" not in tag:
@@ -179,7 +183,7 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
                     int(arr_file.strip(".txt").split('layer')[-1]) > 1):
                 continue
             pf.add_parameters(filenames=arr_file,par_type="grid",par_name_base=arr_file.split('.')[1].replace("_","")+"_gr",
-                              pargp=arr_file.split('.')[1].replace("_","")+"_gr",zone_array=ib,upper_bound=ub,lower_bound=lb,
+                              pargp=arr_file.split('.')[1].replace("_","")+"_gr",zone_array=ib,upper_bound=1.5,lower_bound=0.5,
                               geostruct=grid_gs)
             #pf.add_parameters(filenames=arr_file, par_type="pilotpoints", par_name_base=arr_file.split('.')[1].replace("_","")+"_pp",
             #                  pargp=arr_file.split('.')[1].replace("_","")+"_pp", zone_array=ib,upper_bound=ub,lower_bound=lb,
@@ -192,9 +196,11 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
             pppdf.to_csv(pp_file,index=False)
             pp_files.append(os.path.split(pp_file)[1])
             mod_files.append(arr_file)
-            pf.add_parameters(os.path.split(pp_file)[1],par_type="grid",index_cols=["ppname","x","y"],use_cols=["value","bearing"],
-                par_name_base=["","bearing"],pargp=["pp","bearing"],upper_bound=[ub*5,200],lower_bound=[lb/5,160],
+            df = pf.add_parameters(os.path.split(pp_file)[1],par_type="grid",index_cols=["ppname","x","y"],use_cols=["value","bearing"],
+                par_name_base=["pp","bearing"],pargp=["pp","bearing"],upper_bound=[ub*5,200],lower_bound=[lb/5,160],
                 par_style="direct",transform="log")
+            df = df.loc[df.parnme.str.contains("bearing"),:]
+            bearing_dfs.append(df)
             if include_constants:
                 pf.add_parameters(filenames=arr_file, par_type="constant",
                                   par_name_base=arr_file.split('.')[1].replace("_", "") + "_cn",
@@ -253,6 +259,18 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
     if grid_gs.variograms[0].anisotropy != 1.0:
         use_specsim = False
     pe = pf.draw(num_reals, use_specsim=use_specsim)
+
+    par = pst.parameter_data
+    new_dfs = []
+
+    for bearing_df in bearing_dfs:
+        bearing_df.loc[:,"x"] = par.loc[bearing_df.parnme,"x"].astype(float)
+        bearing_df.loc[:,"y"] = par.loc[bearing_df.parnme,"y"].astype(float)
+        new_dfs.append(bearing_df)
+    bpe = pyemu.helpers.geostatistical_draws(pst=pst,struct_dict={pp_gs:new_dfs},num_reals=num_reals)
+    bpar = par.loc[par.parnme.str.contains("bearing"),"parnme"].values
+    pe.loc[:,bpar] = bpe.loc[:,bpar].values
+
     if binary_pe:
         pe.to_binary(os.path.join(template_ws, "prior.jcb"))
     else:
@@ -931,27 +949,36 @@ def ensemble_stacking_experiment():
 
 
 def run_a_real(t_d):
-    pst = pyemu.Pst(os.path.join(t_d,"freyberg.pst"))
-    pe_fname = pst.pestpp_options["ies_par_en"]
-    if pe_fname.endswith('.jcb'):
-        pe = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,pe_fname))
-    else:
-        pe  = pd.read_csv(os.path.join(t_d,pe_fname),index_col=0)
-    par = pst.parameter_data
-    par.loc[:,"parval1"] = pe.loc[pe.index[0],pst.par_names].values
-    pst_name = "freyberg_{0}.pst".format(pe.index[0])
-    pst.control_data.noptmax = 0
-    pst.write(os.path.join(t_d,pst_name),version=2)
-    pyemu.os_utils.run("pestpp-ies {0}".format(pst_name),cwd=t_d)
+    # pst = pyemu.Pst(os.path.join(t_d,"freyberg.pst"))
+    # pe_fname = pst.pestpp_options["ies_par_en"]
+    # if pe_fname.endswith('.jcb'):
+    #     pe = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,pe_fname))
+    # else:
+    #     pe  = pd.read_csv(os.path.join(t_d,pe_fname),index_col=0)
+    # par = pst.parameter_data
+    # par.loc[:,"parval1"] = pe.loc[pe.index[0],pst.par_names].values
+    # pst_name = "freyberg_{0}.pst".format(pe.index[0])
+    # pst.control_data.noptmax = 0
+    # pst.write(os.path.join(t_d,pst_name),version=2)
+    # pyemu.os_utils.run("pestpp-ies {0}".format(pst_name),cwd=t_d)
 
     iarr = np.loadtxt(os.path.join(t_d,"interp_freyberg6.npf_k_layer1.txt"))
     garr = np.loadtxt(os.path.join(t_d,"mult","npfklayer1_gr_inst0_grid.csv"))
     arr = np.loadtxt(os.path.join(t_d,"freyberg6.npf_k_layer1.txt"))
 
+    ib = np.loadtxt(os.path.join(t_d,"freyberg6.dis_idomain_layer1.txt"),dtype=int)
+    iarr[ib==0] = np.nan
+    garr[ib==0] = np.nan
+    arr[ib==0] = np.nan
+
+    hds = flopy.utils.HeadFile(os.path.join(t_d,"freyberg6_freyberg.hds"))
+    harr = hds.get_data()[0,:,:]
+    harr[ib==0] = np.nan
     fig,axes = plt.subplots(1,3,figsize=(28,10))
 
     ax = axes[0]
     cb = ax.imshow(np.log10(garr))
+    
     plt.colorbar(cb,ax=ax)
     ax.set_title("grid array")
 
@@ -963,6 +990,9 @@ def run_a_real(t_d):
     ax = axes[2]
     cb = ax.imshow(np.log10(arr))
     plt.colorbar(cb,ax=ax)
+
+    levs = ax.contour(harr,levels=6,colors='k')
+    ax.clabel(levs,levs.levels)
     ax.set_title("hk array")
     plt.show()
 
@@ -1025,8 +1055,8 @@ if __name__ == "__main__":
     #exit()
 
     #setup the pest interface for conditioning realizations
-    setup_interface("freyberg_monthly",num_reals=100,full_interface=True,include_constants=True,
-       binary_pe=True)
+    #setup_interface("freyberg_monthly",num_reals=100,full_interface=True,include_constants=True,
+    #   binary_pe=True)
     
     run_a_real("monthly_template")
     exit()
