@@ -480,8 +480,14 @@ def write_par_sum(pst_file):
     pst.write_par_summary_table(os.path.split(pst_file)[0] + "_par_sum.tex",group_names=name_dict)
 
 
-def set_obsvals_weights(t_d,double_ineq_ss=True):
-    lines = open(os.path.join(t_d,"freyberg6.obs"),'r').readlines()
+def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True):
+
+    tpst = pyemu.Pst(os.path.join(truth_m_d,"freyberg.pst"))
+    toe = pyemu.ObservationEnsemble.from_binary(pst=tpst,filename=os.path.join(truth_m_d,"freyberg.0.obs.jcb"))
+    truth = toe.loc[toe.index[0],:].to_dict()
+    #lines = open(os.path.join(t_d,"freyberg6.obs"),'r').readlines()
+    lines = open(os.path.join(t_d,"freyberg6.obs_continuous_heads.csv.txt"),'r').readlines()
+    
     ijs = []
     for line in lines:
         if line.lower().strip().startswith("trgw"):
@@ -489,6 +495,7 @@ def set_obsvals_weights(t_d,double_ineq_ss=True):
             i,j = int(raw[-2])-1,int(raw[-1])-1
             ijs.append((i,j))
     ijs = list(set(ijs))
+    assert len(ijs) > 0
     pst = pyemu.Pst(os.path.join(t_d, "freyberg.pst"))
     obs = pd.read_csv(os.path.join(t_d, "freyberg.obs_data_orig.csv"))
     obs = obs.set_index('obsnme', drop=False)
@@ -519,7 +526,6 @@ def set_obsvals_weights(t_d,double_ineq_ss=True):
     #np.random.seed(222)
     np.random.seed(555)
     #idxs = np.random.randint(0,len(ijs),4)
-    #print(ijs)
     #exit()
     #ijs = [ijs[i] for i in idxs]
     
@@ -545,12 +551,13 @@ def set_obsvals_weights(t_d,double_ineq_ss=True):
     hk_iq_nznames = hk_nznames[::4]
     hk_nznames = [n for n in hk_nznames if n not in hk_iq_nznames]
 
-    vals = np.random.normal(0,1.0,len(hk_nznames))
+    #vals = np.random.normal(0,1.0,len(hk_nznames))
+    vals = np.array([truth[n] for n in hk_nznames])
     #set one really low
     #vals[-1] = -2.0
-    vals = pst.observation_data.loc[hk_nznames,"obsval"].values + vals
-    vals[vals > 2.2] = 2.2
-    vals[vals < 0.0] = 0.0
+    #vals = pst.observation_data.loc[hk_nznames,"obsval"].values + vals
+    #vals[vals > 2.2] = 2.2
+    #vals[vals < 0.0] = 0.0
     
     pst.observation_data.loc[hk_nznames, "obsval"] = vals
 
@@ -558,15 +565,17 @@ def set_obsvals_weights(t_d,double_ineq_ss=True):
     pst.observation_data.loc[hk_nznames, "upper_bound"] = vals + 2
     pst.observation_data.loc[hk_nznames, "weight"] = 1.0 + np.cumsum(np.ones(len(hk_nznames))+1)
 
-    vals = pst.observation_data.loc[hk_iq_nznames,"obsval"] - 0.5
+    #vals = pst.observation_data.loc[hk_iq_nznames,"obsval"] - 0.5
+    vals = np.array([truth[n]+0.1 for n in hk_iq_nznames])
     pst.observation_data.loc[hk_iq_nznames, "obsval"] = vals
     #pst.observation_data.loc[hk_iq_nzname, "lower_bound"] = val - 1
     #pst.observation_data.loc[hk_iq_nzname, "upper_bound"] = val + 1
     pst.observation_data.loc[hk_iq_nznames, "weight"] = 20.0
     pst.observation_data.loc[hk_iq_nznames, "obgnme"] = obs.loc[hk_iq_nznames,"oname"].apply(lambda x: "less_than_"+x)
     
-    vals = np.random.normal(1.5, 0.1, len(w_nznames))
+    #vals = np.random.normal(1.5, 0.1, len(w_nznames))
     #vals = pst.observation_data.loc[w_nznames, "obsval"].values + vals
+    vals = np.array([truth[n] - 0.1 for n in w_nznames])
     pst.observation_data.loc[w_nznames, "obsval"] = vals
     pst.observation_data.loc[w_nznames, "lower_bound"] = vals - 1
     pst.observation_data.loc[w_nznames, "upper_bound"] = vals + 1
@@ -574,13 +583,14 @@ def set_obsvals_weights(t_d,double_ineq_ss=True):
     pst.observation_data.loc[w_nznames, "obgnme"] = obs.loc[w_nznames,"oname"].apply(lambda x: "greater_than_well_"+x)
 
     pst.observation_data.loc[:,"observed_value"] = pst.observation_data.obsval.values
-    vals = np.random.normal(0, 1.0, len(ss_nznames))
+    #vals = np.random.normal(0, 1.0, len(ss_nznames))
     if double_ineq_ss is True:
         skip_ijs = [obs.loc[n,"ij"] for n in hk_iq_nznames]
         ss_nznames = [n for n in ss_nznames if obs.loc[n,"ij"] not in skip_ijs]
         dup_ss_nznames = [n.replace("sto","dup-sto") for n in ss_nznames]
-        vals = np.random.normal(0, 1.0, len(ss_nznames))
-        vals = pst.observation_data.loc[ss_nznames, "obsval"].values + vals
+        #vals = np.random.normal(0, 1.0, len(ss_nznames))
+        #vals = pst.observation_data.loc[ss_nznames, "obsval"].values + vals
+        vals = np.array([truth[n] for n in ss_nznames])
         pst.observation_data.loc[ss_nznames, "obsval"] = vals - 0.75
         pst.observation_data.loc[dup_ss_nznames, "obsval"] = vals + 0.75
         pst.observation_data.loc[ss_nznames, "obgnme"] = obs.loc[ss_nznames,"oname"].apply(lambda x: "greater_than_"+x)
@@ -592,7 +602,8 @@ def set_obsvals_weights(t_d,double_ineq_ss=True):
 
     else:
 
-        vals = pst.observation_data.loc[ss_nznames, "obsval"].values + vals
+        #vals = pst.observation_data.loc[ss_nznames, "obsval"].values + vals
+        vals = np.array([truth[n] for n in ss_nznames])
         pst.observation_data.loc[ss_nznames, "obsval"] = vals
         pst.observation_data.loc[ss_nznames, "lower_bound"] = vals - 1.5
         pst.observation_data.loc[ss_nznames, "upper_bound"] = vals + 1.5
@@ -1055,31 +1066,31 @@ if __name__ == "__main__":
     #exit()
 
     #setup the pest interface for conditioning realizations
-    #setup_interface("freyberg_monthly",num_reals=100,full_interface=True,include_constants=True,
+    # setup_interface("freyberg_monthly",num_reals=100,full_interface=True,include_constants=True,
     #   binary_pe=True)
     
-    run_a_real("monthly_template")
-    exit()
+    #run_a_real("monthly_template")
+    #exit()
     # run for truth...
-    full_t_d = "daily_template"
-    truth_m_d = "daily_truth_prior_master"
-    run(full_t_d,num_workers=5,num_reals=100,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
-    
+    full_t_d = "monthly_template"
+    truth_m_d = "monthly_truth_prior_master"
+    #run(full_t_d,num_workers=10,num_reals=100,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
 
-    exit()
-    cond_t_d = "daily_template_cond"
+    
+    cond_t_d = "monthly_template_cond"
+    #setup_interface("freyberg_monthly",num_reals=300,full_interface=False,include_constants=True,
+    #   binary_pe=True)
     
     # set the observed values and weights for the equality and inequality observations
-    set_obsvals_weights(cond_t_d)
+    #set_obsvals_weights(cond_t_d,truth_m_d)
     
-
     # # setup the localizer matrix
-    build_localizer(cond_t_d)
+    #build_localizer(cond_t_d)
     
     # # run PESTPP-IES to condition the realizations
-    run(cond_t_d,num_workers=20,num_reals=300,noptmax=6,init_lam=-0.1,mm_alpha=None)
-    cond_m_d = "daily_master_cond"
-    
+    run(cond_t_d,num_workers=15,num_reals=300,noptmax=6,init_lam=-0.1,mm_alpha=None)
+    cond_m_d = "monthly_master_cond"
+    exit()
     # # now setup a corresponding interface that will actually run MODFLOW
     # setup_interface("freyberg_daily",num_reals=500,full_interface=True,include_constants=True)
     flow_t_d = "daily_template"
