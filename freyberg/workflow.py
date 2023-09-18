@@ -670,8 +670,8 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
             f.write("npf,0.35\n")
             f.write("sto,0.15\n")
             
-            f.write("trgw,0.25\n")
-            f.write("gage,0.25\n")
+            f.write("trgw,0.35\n")
+            f.write("gage,0.15\n")
             
         pst.pestpp_options["ies_phi_factor_file"] = "phi.csv"
 
@@ -1158,7 +1158,7 @@ if __name__ == "__main__":
     # # run PESTPP-IES to condition the realizations
     noptmax = 10
     m_d = "master_joint"
-    run(cond_t_d,m_d=m_d,num_workers=8,num_reals=300,noptmax=noptmax)
+    run(cond_t_d,m_d=m_d,num_workers=10,num_reals=300,noptmax=noptmax)
     cond_m_d = m_d #"monthly_master_cond"
     
     # # now setup a corresponding interface that will actually run MODFLOW
