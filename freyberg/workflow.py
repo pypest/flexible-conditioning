@@ -197,7 +197,7 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
             pp_files.append(os.path.split(pp_file)[1])
             mod_files.append(arr_file)
             df = pf.add_parameters(os.path.split(pp_file)[1],par_type="grid",index_cols=["ppname","x","y"],use_cols=["value","bearing"],
-                par_name_base=["pp"+base,"bearing"+base],pargp=["pp"+base,"bearing"+base],upper_bound=[ub*5,200],lower_bound=[lb/5,160],
+                par_name_base=[base+"_pp"+base,base+"_bearing"],pargp=[base+"_pp",base+"_bearing"],upper_bound=[ub*5,200],lower_bound=[lb/5,160],
                 par_style="direct",transform="log")
             df = df.loc[df.parnme.str.contains("bearing"),:]
             bearing_dfs.append(df)
@@ -1096,7 +1096,7 @@ if __name__ == "__main__":
     #build_localizer(cond_t_d)
     
     # # run PESTPP-IES to condition the realizations
-    noptmax = 5
+    noptmax = 3
     #run(cond_t_d,num_workers=15,num_reals=100,noptmax=noptmax,init_lam=-0.1,mm_alpha=None)
     cond_m_d = "monthly_master_cond"
     
