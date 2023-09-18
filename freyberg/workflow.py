@@ -324,7 +324,7 @@ def apply_pps():
     gridspec_fname = "grid.spc"
     for model_file,pp_file in zip(df.model_file,df.pp_file):
         ppdf = pd.read_csv(pp_file)
-        interp = helpers.interpolate_with_sva_pilotpoints_2d(ppdf,gridspec_fname)
+        interp = helpers.interpolate_with_sva_pilotpoints_2d(ppdf,gridspec_fname,vartransform="log")
         org_arr = np.loadtxt(model_file)
         interp = interp.reshape(org_arr.shape)
         new_arr = org_arr * interp
@@ -959,19 +959,23 @@ def ensemble_stacking_experiment():
         shutil.copy2(pdf,new_pdf)
 
 
-def run_a_real(t_d):
-    # pst = pyemu.Pst(os.path.join(t_d,"freyberg.pst"))
-    # pe_fname = pst.pestpp_options["ies_par_en"]
-    # if pe_fname.endswith('.jcb'):
-    #     pe = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,pe_fname))
-    # else:
-    #     pe  = pd.read_csv(os.path.join(t_d,pe_fname),index_col=0)
-    # par = pst.parameter_data
-    # par.loc[:,"parval1"] = pe.loc[pe.index[0],pst.par_names].values
-    # pst_name = "freyberg_{0}.pst".format(pe.index[0])
-    # pst.control_data.noptmax = 0
-    # pst.write(os.path.join(t_d,pst_name),version=2)
-    # pyemu.os_utils.run("pestpp-ies {0}".format(pst_name),cwd=t_d)
+def run_a_real(t_d,real_name=None,pe_fname=None):
+    pst = pyemu.Pst(os.path.join(t_d,"freyberg.pst"))
+    
+    if pe_fname is None:
+        pe_fname = pst.pestpp_options["ies_par_en"]
+    if pe_fname.endswith('.jcb'):
+        pe = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,pe_fname))
+    else:
+        pe  = pd.read_csv(os.path.join(t_d,pe_fname),index_col=0)
+    par = pst.parameter_data
+    if real_name is None:
+        real_name = pe.index[0]
+    par.loc[:,"parval1"] = pe.loc[real_name,pst.par_names].values
+    pst_name = "freyberg_{0}.pst".format(real_name)
+    pst.control_data.noptmax = 0
+    pst.write(os.path.join(t_d,pst_name),version=2)
+    pyemu.os_utils.run("pestpp-ies {0}".format(pst_name),cwd=t_d)
 
     iarr = np.loadtxt(os.path.join(t_d,"interp_freyberg6.npf_k_layer1.txt"))
     garr = np.loadtxt(os.path.join(t_d,"mult","npfklayer1_gr_inst0_grid.csv"))
@@ -1055,6 +1059,9 @@ def daily_to_monthly(daily_d="freyberg_daily",monthly_d="freyberg_monthly"):
     sim.set_sim_path(monthly_d)
     sim.set_all_data_external(check_data=True)
     sim.write_simulation()
+
+
+
 if __name__ == "__main__":
 
 
@@ -1066,31 +1073,33 @@ if __name__ == "__main__":
     #exit()
 
     #setup the pest interface for conditioning realizations
-    # setup_interface("freyberg_monthly",num_reals=100,full_interface=True,include_constants=True,
-    #   binary_pe=True)
+    setup_interface("freyberg_monthly",num_reals=100,full_interface=True,include_constants=True,
+       binary_pe=True)
     
-    #run_a_real("monthly_template")
+    #run_a_real("monthly_master_cond",real_name="65",pe_fname="freyberg.0.par.jcb")
     #exit()
+    
     # run for truth...
     full_t_d = "monthly_template"
     truth_m_d = "monthly_truth_prior_master"
-    #run(full_t_d,num_workers=10,num_reals=100,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
+    run(full_t_d,num_workers=10,num_reals=100,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
 
     
     cond_t_d = "monthly_template_cond"
-    #setup_interface("freyberg_monthly",num_reals=300,full_interface=False,include_constants=True,
-    #   binary_pe=True)
+    setup_interface("freyberg_monthly",num_reals=100,full_interface=False,include_constants=True,
+       binary_pe=True)
     
     # set the observed values and weights for the equality and inequality observations
-    #set_obsvals_weights(cond_t_d,truth_m_d)
+    set_obsvals_weights(cond_t_d,truth_m_d)
     
     # # setup the localizer matrix
     #build_localizer(cond_t_d)
     
     # # run PESTPP-IES to condition the realizations
-    run(cond_t_d,num_workers=15,num_reals=300,noptmax=6,init_lam=-0.1,mm_alpha=None)
+    run(cond_t_d,num_workers=15,num_reals=100,noptmax=3,init_lam=-0.1,mm_alpha=None)
     cond_m_d = "monthly_master_cond"
-    exit()
+    
+
     # # now setup a corresponding interface that will actually run MODFLOW
     # setup_interface("freyberg_daily",num_reals=500,full_interface=True,include_constants=True)
     flow_t_d = "daily_template"
