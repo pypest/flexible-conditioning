@@ -479,13 +479,17 @@ def namer(name):
     tag = raw.split("layer")[0]
     full_name = None
     if tag == "npfk":
-        full_name = "horizontal hydraulic conductivity"
+        #full_name = "horizontal hydraulic conductivity"
+        full_name = "hk"
     elif tag == "stoss":
-        full_name = "specific storage"
+        #full_name = "specific storage"
+        full_name = "ss"
     elif tag == "npfk33":
-        full_name = "vertical hydraulic conductivity"
+        #full_name = "vertical hydraulic conductivity"
+        full_name = "vk"
     elif tag == "stosy":
-        full_name = "specific yield"
+        #full_name = "specific yield"
+        full_name = "sy"
     else:
         raise Exception("{0}:{1}".format(tag,name))
     full_name += ", layer:{0}".format(layer)
@@ -705,13 +709,14 @@ def plot_results_pub(m_d, ardim=None, pstf="test_run", log_oe=True,noptmax=None)
     ax_count = 0
     with PdfPages("results_pub_si.pdf") as pdf:
         for oname in onames:
-            fig, axes = plt.subplots(2, 3, figsize=(11,8.4))
+            fig, axes = plt.subplots(2, 4, figsize=(14,8.4))
             # cheating to get layer from oname
             #if "klayer3" not in oname and "klayer1" not in oname and "sslayer1" not in oname:
             #    continue
             print(oname)
             k = int(oname[-1]) - 1
             oobs = obs.loc[obs.oname==oname,:].copy()
+
             nzobs = oobs.loc[oobs.weight > 0]
             dups = obs.loc[obs.oname==oname+"dup",:]
             dups = dups.loc[dups.weight > 0]
@@ -739,7 +744,13 @@ def plot_results_pub(m_d, ardim=None, pstf="test_run", log_oe=True,noptmax=None)
             pt_arr[oobs.i.astype(int), oobs.j.astype(int)] = pt_oe.loc[:, oobs.obsnme].std().values
             pr_arr[ib[k] <= 0] = np.NaN
             pt_arr[ib[k] <= 0] = np.NaN
-            mn, mx = min(np.nanmin(pr_arr), np.nanmin(pt_arr)), max(np.nanmax(pr_arr), np.nanmax(pt_arr))
+            truth_arr = np.zeros((nrow,ncol))
+            truth_arr[oobs.i.astype(int), oobs.j.astype(int)] = oobs.truth_val.values
+            truth_arr[ib[k] <= 0] = np.NaN
+                
+            mn = min(np.nanmin(pr_arr), np.nanmin(pt_arr),np.nanmin(truth_arr)) 
+            mx = max(np.nanmax(pr_arr), np.nanmax(pt_arr),np.nanmax(truth_arr))
+
             irow = 0
             cb = axes[0,irow].imshow(pr_arr, vmin=mn, vmax=mx)
             plt.colorbar(cb, ax=axes[0,irow],label="$log_{10}$")
@@ -797,16 +808,20 @@ def plot_results_pub(m_d, ardim=None, pstf="test_run", log_oe=True,noptmax=None)
                 pt_arr[oobs.i.astype(int), oobs.j.astype(int)] = pt_oe.loc[idx, oobs.obsnme].values
                 pr_arr[ib[k] <= 0] = np.NaN
                 pt_arr[ib[k] <= 0] = np.NaN
-                mn, mx = min(np.nanmin(pr_arr), np.nanmin(pt_arr)), max(np.nanmax(pr_arr), np.nanmax(pt_arr))
+                mn = min(np.nanmin(pr_arr), np.nanmin(pt_arr),np.nanmin(truth_arr)) 
+                mx = max(np.nanmax(pr_arr), np.nanmax(pt_arr),np.nanmax(truth_arr))
                 cb = axes[0,irow].imshow(pr_arr, vmin=mn, vmax=mx)
                 cbar0 = plt.colorbar(cb, ax=axes[0,irow],label="$log_{10}$")
                 cb = axes[1,irow].imshow(pt_arr, vmin=mn, vmax=mx)
                 cbar1 = plt.colorbar(cb, ax=axes[1,irow],label="$log_{10}$")
 
+
+
                 axes[0,irow].set_title("{2}) prior realization {0}\n{1} ".format(idx,namer(grp),ax_count), loc="left")
                 ax_count += 1
                 axes[1,irow].set_title("{2}) posterior realization {0}\n{1}".format(idx,namer(grp),ax_count), loc="left")
                 ax_count += 1
+
                 #for ax in axes.flatten():
                     # ax.imshow(nz_arr,vmin=mn,vmax=mx)
                 if scatter:
@@ -867,13 +882,19 @@ def plot_results_pub(m_d, ardim=None, pstf="test_run", log_oe=True,noptmax=None)
                                          textcoords="offset points", va="bottom", ha="left", color=tc,
                                          bbox=dict(boxstyle='round', facecolor=fc, alpha=1.0))
                 irow += 1
+            cb = axes[0,-1].imshow(truth_arr, vmin=mn, vmax=mx)
+            cbar2 = plt.colorbar(cb, ax=axes[0,-1],label="$log_{10}$")
+            axes[0,-1].set_title("{0}) truth {1}".format(ax_count,namer(grp)))
+            ax_count += 1
+            axes[-1,-1].axis("off")
             plt.tight_layout()
             pdf.savefig()
             plt.close(fig)
 
 
-def plot_par_changes(m_d,noptmax=None):
+def plot_par_changes(m_d,noptmax=None,include_insample=False):
     pst = pyemu.Pst(os.path.join(m_d,"freyberg.pst"))
+    obs = pst.observation_data
     if noptmax is None:
         noptmax = pst.control_data.noptmax
     pr = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(m_d,"freyberg.0.par.jcb"))
@@ -884,12 +905,14 @@ def plot_par_changes(m_d,noptmax=None):
     par = pst.parameter_data
     pnames = par.pname.unique()
     pnames.sort()
+    
     tdict = {"cn":"layer constant","pp":"pilot points","gr":"grid-scale","bearing":"bearing"}
-    fig,axes = plt.subplots(len(pnames),3,figsize=(11.5,8))
+    fig,axes = plt.subplots(len(pnames),4,figsize=(11.5,8))
     for irow,pname in enumerate(pnames):
         ppar = par.loc[par.pname==pname,:].copy()
         grps = ppar.pargp.unique()
         grps.sort()
+        
         for jcol,grp in enumerate(grps):
             gpar = ppar.loc[ppar.pargp==grp,:]
             ax = axes[irow,jcol]

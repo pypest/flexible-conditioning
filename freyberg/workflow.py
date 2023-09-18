@@ -502,6 +502,7 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True):
     obs.loc[:, "weight"] = 0.0
     obs.loc[:, "lower_bound"] = -30
     obs.loc[:, "upper_bound"] = 30
+    obs.loc[:,"truth_val"] = obs.obsnme.apply(lambda x: truth[x])
     pst.observation_data = obs
     obs = obs.loc[obs.otype == "arr", :].copy()
     obs.loc[:, "i"] = obs.i.astype(int)
@@ -591,8 +592,8 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True):
         #vals = np.random.normal(0, 1.0, len(ss_nznames))
         #vals = pst.observation_data.loc[ss_nznames, "obsval"].values + vals
         vals = np.array([truth[n] for n in ss_nznames])
-        pst.observation_data.loc[ss_nznames, "obsval"] = vals - 0.75
-        pst.observation_data.loc[dup_ss_nznames, "obsval"] = vals + 0.75
+        pst.observation_data.loc[ss_nznames, "obsval"] = vals - 0.25
+        pst.observation_data.loc[dup_ss_nznames, "obsval"] = vals + 0.25
         pst.observation_data.loc[ss_nznames, "obgnme"] = obs.loc[ss_nznames,"oname"].apply(lambda x: "greater_than_"+x)
         pst.observation_data.loc[dup_ss_nznames, "obgnme"] = obs.loc[dup_ss_nznames,"oname"].apply(lambda x: "less_than_"+x)
         pst.observation_data.loc[ss_nznames, "weight"] = 10.0
@@ -1091,12 +1092,12 @@ if __name__ == "__main__":
     
     # set the observed values and weights for the equality and inequality observations
     #set_obsvals_weights(cond_t_d,truth_m_d)
-    
+    #exit()
     # # setup the localizer matrix
     #build_localizer(cond_t_d)
     
     # # run PESTPP-IES to condition the realizations
-    noptmax = 3
+    noptmax = 5
     #run(cond_t_d,num_workers=15,num_reals=100,noptmax=noptmax,init_lam=-0.1,mm_alpha=None)
     cond_m_d = "monthly_master_cond"
     
@@ -1128,7 +1129,7 @@ if __name__ == "__main__":
     #plot_mult(cond_t_d)
     #plot_domain()
     processing.plot_results_pub(cond_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
-    processing.plot_histo_pub(cond_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
-    processing.plot_histo(cond_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
-    processing.plot_par_changes(cond_m_d)
+    #processing.plot_histo_pub(cond_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+    #processing.plot_histo(cond_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+    #processing.plot_par_changes(cond_m_d)
 
