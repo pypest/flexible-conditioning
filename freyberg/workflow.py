@@ -197,7 +197,7 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
             pp_files.append(os.path.split(pp_file)[1])
             mod_files.append(arr_file)
             df = pf.add_parameters(os.path.split(pp_file)[1],par_type="grid",index_cols=["ppname","x","y"],use_cols=["value","bearing"],
-                par_name_base=[base+"_pp"+base,base+"_bearing"],pargp=[base+"_pp",base+"_bearing"],upper_bound=[ub*5,200],lower_bound=[lb/5,160],
+                par_name_base=[base+"pp"+base,base+"bearing"],pargp=[base+"_pp",base+"_bearing"],upper_bound=[ub*5,200],lower_bound=[lb/5,160],
                 par_style="direct",transform="log")
             df = df.loc[df.parnme.str.contains("bearing"),:]
             bearing_dfs.append(df)
@@ -703,13 +703,14 @@ def build_localizer(t_d):
     print(par.pname.unique())
     print(obs.oname.unique())
     onames = set(obs.oname.unique())
-    par = par.loc[par.pname.apply(lambda x: x in onames)]
+    #par = par.loc[par.pname.apply(lambda x: x in onames)]
     ogp = obs.obgnme.unique()
     ogp.sort()
     pgp = par.pargp.unique()
     pgp.sort()
     df = pd.DataFrame(index=ogp,columns=pgp,dtype=float)
     df.loc[:,:] = 0.0
+    
     obs.loc[:,"oname_dedup"] = obs.oname.apply(lambda x: x.replace("dup-",""))
     for name in onames:
         ppar = par.loc[par.pname==name,:].copy()
@@ -722,7 +723,7 @@ def build_localizer(t_d):
         df.loc[oogp,ppgp] = 1.0
     fig,ax = plt.subplots(1,1,figsize=(10,10))
     x = df.values.copy()
-    x[x==0.0] = np.nan
+    #x[x==0.0] = np.nan
     ax.imshow(x)
     ax.set_xticks(np.arange(len(pgp)))
     ax.set_yticks(np.arange(len(ogp)))
@@ -736,6 +737,7 @@ def build_localizer(t_d):
     pst.pestpp_options["ies_localizer"] = "loc.csv"
     pst.control_data.noptmax = -2
     pst.write(os.path.join(t_d,"freyberg.pst"),version=2)
+
     pyemu.os_utils.run("pestpp-ies freyberg.pst",cwd=t_d)
 
 def transfer_pars(cond_pst_file,cond_pe_file,flow_t_d,joint_pe_file):
@@ -1074,8 +1076,8 @@ if __name__ == "__main__":
     #exit()
 
     # setup the pest interface for conditioning realizations
-    #setup_interface("freyberg_monthly",num_reals=100,full_interface=True,include_constants=True,
-    #   binary_pe=True)
+    setup_interface("freyberg_monthly",num_reals=100,full_interface=True,include_constants=True,
+       binary_pe=True)
     
     #run_a_real("monthly_master_cond",real_name="65",pe_fname="freyberg.0.par.jcb")
     #exit()
@@ -1083,25 +1085,24 @@ if __name__ == "__main__":
     # run for truth...
     full_t_d = "monthly_template"
     truth_m_d = "monthly_truth_prior_master"
-    #run(full_t_d,num_workers=10,num_reals=100,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
+    run(full_t_d,num_workers=10,num_reals=100,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
 
     
     cond_t_d = "monthly_template_cond"
-    #setup_interface("freyberg_monthly",num_reals=100,full_interface=False,include_constants=True,
-    #   binary_pe=True)
+    setup_interface("freyberg_monthly",num_reals=100,full_interface=False,include_constants=True,
+       binary_pe=True)
     
     # set the observed values and weights for the equality and inequality observations
-    #set_obsvals_weights(cond_t_d,truth_m_d)
-    #exit()
+    set_obsvals_weights(cond_t_d,truth_m_d)
+    
     # # setup the localizer matrix
-    #build_localizer(cond_t_d)
+    build_localizer(cond_t_d)
     
     # # run PESTPP-IES to condition the realizations
-    noptmax = 5
-    #run(cond_t_d,num_workers=15,num_reals=100,noptmax=noptmax,init_lam=-0.1,mm_alpha=None)
+    noptmax = 10
+    run(cond_t_d,num_workers=15,num_reals=100,noptmax=noptmax,init_lam=-0.1,mm_alpha=None)
     cond_m_d = "monthly_master_cond"
     
-
     # # now setup a corresponding interface that will actually run MODFLOW
     # setup_interface("freyberg_daily",num_reals=500,full_interface=True,include_constants=True)
     flow_t_d = "daily_template"
@@ -1129,7 +1130,7 @@ if __name__ == "__main__":
     #plot_mult(cond_t_d)
     #plot_domain()
     processing.plot_results_pub(cond_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
-    #processing.plot_histo_pub(cond_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
-    #processing.plot_histo(cond_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
-    #processing.plot_par_changes(cond_m_d)
+    processing.plot_histo_pub(cond_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+    processing.plot_histo(cond_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+    processing.plot_par_changes(cond_m_d)
 
