@@ -197,7 +197,7 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
             pp_files.append(os.path.split(pp_file)[1])
             mod_files.append(arr_file)
             df = pf.add_parameters(os.path.split(pp_file)[1],par_type="grid",index_cols=["ppname","x","y"],use_cols=["value","bearing"],
-                par_name_base=["pp","bearing"],pargp=["pp","bearing"],upper_bound=[ub*5,200],lower_bound=[lb/5,160],
+                par_name_base=["pp"+base,"bearing"+base],pargp=["pp"+base,"bearing"+base],upper_bound=[ub*5,200],lower_bound=[lb/5,160],
                 par_style="direct",transform="log")
             df = df.loc[df.parnme.str.contains("bearing"),:]
             bearing_dfs.append(df)
@@ -1072,9 +1072,9 @@ if __name__ == "__main__":
     #ensemble_stacking_experiment()
     #exit()
 
-    #setup the pest interface for conditioning realizations
-    setup_interface("freyberg_monthly",num_reals=100,full_interface=True,include_constants=True,
-       binary_pe=True)
+    # setup the pest interface for conditioning realizations
+    #setup_interface("freyberg_monthly",num_reals=100,full_interface=True,include_constants=True,
+    #   binary_pe=True)
     
     #run_a_real("monthly_master_cond",real_name="65",pe_fname="freyberg.0.par.jcb")
     #exit()
@@ -1082,21 +1082,22 @@ if __name__ == "__main__":
     # run for truth...
     full_t_d = "monthly_template"
     truth_m_d = "monthly_truth_prior_master"
-    run(full_t_d,num_workers=10,num_reals=100,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
+    #run(full_t_d,num_workers=10,num_reals=100,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
 
     
     cond_t_d = "monthly_template_cond"
-    setup_interface("freyberg_monthly",num_reals=100,full_interface=False,include_constants=True,
-       binary_pe=True)
+    #setup_interface("freyberg_monthly",num_reals=100,full_interface=False,include_constants=True,
+    #   binary_pe=True)
     
     # set the observed values and weights for the equality and inequality observations
-    set_obsvals_weights(cond_t_d,truth_m_d)
+    #set_obsvals_weights(cond_t_d,truth_m_d)
     
     # # setup the localizer matrix
     #build_localizer(cond_t_d)
     
     # # run PESTPP-IES to condition the realizations
-    run(cond_t_d,num_workers=15,num_reals=100,noptmax=3,init_lam=-0.1,mm_alpha=None)
+    noptmax = 5
+    #run(cond_t_d,num_workers=15,num_reals=100,noptmax=noptmax,init_lam=-0.1,mm_alpha=None)
     cond_m_d = "monthly_master_cond"
     
 
@@ -1126,8 +1127,8 @@ if __name__ == "__main__":
     #make_kickass_figs()
     #plot_mult(cond_t_d)
     #plot_domain()
-    processing.plot_results_pub(cond_m_d, pstf="freyberg", log_oe=False,noptmax=6)
-    processing.plot_histo_pub(cond_m_d, pstf="freyberg", log_oe=False, noptmax=6)
-    processing.plot_histo(cond_m_d, pstf="freyberg", log_oe=False, noptmax=6)
+    processing.plot_results_pub(cond_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
+    processing.plot_histo_pub(cond_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+    processing.plot_histo(cond_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
     processing.plot_par_changes(cond_m_d)
 

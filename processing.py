@@ -470,7 +470,12 @@ def namer(name):
     print(raw)
     if ":" in raw:
         raw = raw.split(":")[1]
-    layer = int(raw[-1])
+    try:
+
+        layer = int(raw[-1])
+    except Exception as e:
+        print(name)
+        raise Exception("error casting layer: "+str(e))
     tag = raw.split("layer")[0]
     full_name = None
     if tag == "npfk":
@@ -779,7 +784,8 @@ def plot_results_pub(m_d, ardim=None, pstf="test_run", log_oe=True,noptmax=None)
 
             # a few reals
             irow = 1
-            for idx in [pt_oe.index.values[5],pt_oe.index.values[105]]:
+            indices = 5,45
+            for idx in [pt_oe.index.values[indices[0]],pt_oe.index.values[indices[1]]]:
                 print(idx,grp)
                 #nz_arr = np.zeros((nrow, ncol))
                 #nz_arr[nzobs.i, nzobs.j] = noise.loc[idx,nzobs.obsnme].values
@@ -878,7 +884,7 @@ def plot_par_changes(m_d,noptmax=None):
     par = pst.parameter_data
     pnames = par.pname.unique()
     pnames.sort()
-    tdict = {"cn":"layer constant","pp":"pilot points","gr":"grid-scale"}
+    tdict = {"cn":"layer constant","pp":"pilot points","gr":"grid-scale","bearing":"bearing"}
     fig,axes = plt.subplots(len(pnames),3,figsize=(11.5,8))
     for irow,pname in enumerate(pnames):
         ppar = par.loc[par.pname==pname,:].copy()
