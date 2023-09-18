@@ -480,14 +480,22 @@ def write_par_sum(pst_file):
     pst.write_par_summary_table(os.path.split(pst_file)[0] + "_par_sum.tex",group_names=name_dict)
 
 
-def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True):
+def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=False):
 
     tpst = pyemu.Pst(os.path.join(truth_m_d,"freyberg.pst"))
     toe = pyemu.ObservationEnsemble.from_binary(pst=tpst,filename=os.path.join(truth_m_d,"freyberg.0.obs.jcb"))
-    truth = toe.loc[toe.index[0],:].to_dict()
+    truth_idx = 0
+    truth_real = toe.index[truth_idx]
+    truth = toe.loc[toe.index[truth_idx],:].to_dict()
     #lines = open(os.path.join(t_d,"freyberg6.obs"),'r').readlines()
     lines = open(os.path.join(t_d,"freyberg6.obs_continuous_heads.csv.txt"),'r').readlines()
     
+    pe = pyemu.ParameterEnsemble.from_binary(pst=tpst,filename=os.path.join(truth_m_d,"prior.jcb"))
+    index = [i for ii,i in enumerate(pe.index) if i != truth_real]
+    pe = pe.loc[index,:]
+    pe.to_binary(os.path.join(t_d,"notruth_prior.jcb"))
+    
+
     ijs = []
     for line in lines:
         if line.lower().strip().startswith("trgw"):
@@ -497,13 +505,38 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True):
     ijs = list(set(ijs))
     assert len(ijs) > 0
     pst = pyemu.Pst(os.path.join(t_d, "freyberg.pst"))
+    pst.pestpp_options["ies_par_en"] = "notruth_prior.jcb"
     obs = pd.read_csv(os.path.join(t_d, "freyberg.obs_data_orig.csv"))
     obs = obs.set_index('obsnme', drop=False)
     obs.loc[:, "weight"] = 0.0
-    obs.loc[:, "lower_bound"] = -30
-    obs.loc[:, "upper_bound"] = 30
+    obs.loc[:, "lower_bound"] = np.nan
+    obs.loc[:, "upper_bound"] = np.nan
     obs.loc[:,"truth_val"] = obs.obsnme.apply(lambda x: truth[x])
     pst.observation_data = obs
+
+    if include_modflow_obs:
+        onames = obs.oname.unique()
+        usecols = obs.usecol.unique()
+        assert "hds" in onames
+        assert "gage" in usecols
+        assert "headwater" in usecols
+        assert "tailwater" in usecols
+        keep_usecols = ["trgw-0-74-14","trgw-2-74-14",
+        "trgw-0-8-29","trgw-2-8-29","gage"]
+        obs = pst.observation_data
+        kobs = obs.loc[obs.usecol.apply(lambda x: x in keep_usecols),:].copy()
+        assert kobs.shape[0] > 0
+        kobs["time"] = kobs.time.astype(float)
+        kobs = kobs.loc[kobs.loc[:,"time"] < 13,:]
+        print(kobs)
+        assert kobs.shape[0] == len(keep_usecols) * 12
+        obs.loc[kobs.obsnme,"obsval"] = obs.loc[kobs.obsnme,"truth_val"].values
+        obs.loc[kobs.obsnme,"weight"] = 5
+        obs.loc[kobs.obsnme,"observed"] = True
+        obs.loc[kobs.loc[kobs.usecol.str.startswith("trgw"),"obsnme"],"standard_deviation"] = 1.0
+        obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"standard_deviation"] = kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05
+        obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"weight"] = 1.0 /(kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05)
+        
     obs = obs.loc[obs.otype == "arr", :].copy()
     obs.loc[:, "i"] = obs.i.astype(int)
     obs.loc[:, "j"] = obs.j.astype(int)
@@ -618,11 +651,12 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True):
     df = pyemu.Ensemble._gaussian_draw(
         cov=cov,
         mean_values=mean_vals,
-        num_reals=pst.pestpp_options['ies_num_reals'],
+        num_reals=pe.shape[0],
         grouper=None,
         fill=False,
         factor="eigen",
     )
+    df.index = pe.index
     obs = pst.observation_data
     #print(df.loc[:,hk_iq_nznames])
     
@@ -631,9 +665,21 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True):
     )
     pst.pestpp_options['ies_observation_ensemble'] = "freyberg.obs+noise_0.jcb"
 
+    if include_modflow_obs:
+        with open(os.path.join(t_d,"phi.csv"),'w') as f:
+            f.write("npf,0.35\n")
+            f.write("sto,0.15\n")
+            
+            f.write("trgw,0.25\n")
+            f.write("gage,0.25\n")
+            
+        pst.pestpp_options["ies_phi_factor_file"] = "phi.csv"
+
     #noise = np.random.normal(0,2,(1000,len(hk_nznames)))
 
+    pst.control_data.noptmax = -2
     pst.write(os.path.join(t_d,"freyberg.pst"),version=2)
+    pyemu.os_utils.run("pestpp-ies freyberg.pst",cwd=t_d)
     print(pst.observation_data.loc[
               pst.nnz_obs_names,
               ["obsval", "weight", "lower_bound", "upper_bound"]])
@@ -644,10 +690,12 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True):
             df.loc[:,oname].hist(ax=ax,facecolor="r",alpha=0.5,density=True)
             ylim = ax.get_ylim()
             ax.plot([nzobs.loc[oname,"obsval"],nzobs.loc[oname,"obsval"]],ylim,"r")
+            ax.set_title(oname,loc="left")
             plt.tight_layout()
             pdf.savefig()
             plt.close(fig)
 
+   
 
 
 def plot_fields(m_d):
@@ -721,6 +769,12 @@ def build_localizer(t_d):
         oogp.sort()
         print(name,ppgp,oogp)
         df.loc[oogp,ppgp] = 1.0
+        if name in ["sfr","hds"]:
+            df.loc[oogp,:] = 1.0
+    # check for modflow obs
+    #mfobs = [o for o in onames if o in ["sfr","hds"]]
+    #df.loc[mfobs,:] = 1.0
+
     fig,ax = plt.subplots(1,1,figsize=(10,10))
     x = df.values.copy()
     #x[x==0.0] = np.nan
@@ -1062,6 +1116,8 @@ def daily_to_monthly(daily_d="freyberg_daily",monthly_d="freyberg_monthly"):
     sim.set_sim_path(monthly_d)
     sim.set_all_data_external(check_data=True)
     sim.write_simulation()
+    shutil.copy(os.path.join(exe_dir, mf_exe), os.path.join(monthly_d, mf_exe))
+    pyemu.os_utils.run("mf6",cwd=monthly_d)
 
 
 
@@ -1076,7 +1132,7 @@ if __name__ == "__main__":
     #exit()
 
     # setup the pest interface for conditioning realizations
-    setup_interface("freyberg_monthly",num_reals=100,full_interface=True,include_constants=True,
+    setup_interface("freyberg_monthly",num_reals=300,full_interface=True,include_constants=True,
        binary_pe=True)
     
     #run_a_real("monthly_master_cond",real_name="65",pe_fname="freyberg.0.par.jcb")
@@ -1085,23 +1141,25 @@ if __name__ == "__main__":
     # run for truth...
     full_t_d = "monthly_template"
     truth_m_d = "monthly_truth_prior_master"
-    run(full_t_d,num_workers=10,num_reals=100,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
+    run(full_t_d,num_workers=10,num_reals=300,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
 
     
-    cond_t_d = "monthly_template_cond"
-    setup_interface("freyberg_monthly",num_reals=100,full_interface=False,include_constants=True,
-       binary_pe=True)
+    #cond_t_d = "monthly_template"
+    #setup_interface("freyberg_monthly",num_reals=100,full_interface=True,include_constants=True,
+    #   binary_pe=True)
+    cond_t_d = full_t_d
     
     # set the observed values and weights for the equality and inequality observations
-    set_obsvals_weights(cond_t_d,truth_m_d)
-    
-    # # setup the localizer matrix
+    set_obsvals_weights(cond_t_d,truth_m_d,include_modflow_obs=True)
+   
+    # setup the localizer matrix
     build_localizer(cond_t_d)
     
     # # run PESTPP-IES to condition the realizations
     noptmax = 10
-    run(cond_t_d,num_workers=15,num_reals=100,noptmax=noptmax,init_lam=-0.1,mm_alpha=None)
-    cond_m_d = "monthly_master_cond"
+    m_d = "master_joint"
+    run(cond_t_d,m_d=m_d,num_workers=8,num_reals=300,noptmax=noptmax)
+    cond_m_d = m_d #"monthly_master_cond"
     
     # # now setup a corresponding interface that will actually run MODFLOW
     # setup_interface("freyberg_daily",num_reals=500,full_interface=True,include_constants=True)
