@@ -137,7 +137,7 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
 
 
     # the geostruct for recharge grid-scale parameters
-    rch_v = pyemu.geostats.ExpVario(contribution=1.0, a=1000)
+    rch_v = pyemu.geostats.ExpVario(contribution=1.0, a=3000)
     rch_gs = pyemu.geostats.GeoStruct(variograms=rch_v)
 
     # the geostruct for temporal correlation
@@ -239,6 +239,42 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
         shutil.copy(os.path.join(exe_dir, mf_exe),
                     os.path.join(pf.new_d, mf_exe))
 
+        pf.add_parameters("freyberg6.sfr_packagedata.txt",par_type="grid",index_cols=[0,1,2,3],
+            use_cols=[9],par_name_base="sfrk",pargp="sfrk",upper_bound=3,lower_bound=.3,mfile_sep=" ",mfile_skip=0)
+
+
+        wfiles = [f for f in os.listdir(pf.new_d) if "wel_stress_period_data" in f and f.endswith(".txt")]
+        valid_wfiles = []
+        for wfile in wfiles:
+            kper = int(wfile.split("_")[-1].split('.')[0])
+            if kper > sim.tdis.nper.data:
+                os.remove(os.path.join(pf.new_d,wfile)) #flopy stupidity...
+                continue
+            print(wfile)
+            valid_wfiles.append(wfile)
+            pf.add_parameters(wfile,par_type="grid",index_cols=[0,1,2],use_cols=[3],mfile_sep=" ",mfile_skip=0,
+            upper_bound=1.5,lower_bound=0.5,par_name_base="wel_kper:{0}".format(kper),pargp="wel_kper:{0}".format(kper))
+        assert len(valid_wfiles) == sim.tdis.nper.data,len(valid_wfiles)  
+        #pf.add_parameters(wfiles,par_type="grid",index_cols=[0,1,2],use_cols=[3],mfile_sep=" ",mfile_skip=0,
+        #    upper_bound=1.5,lower_bound=0.5,par_name_base="wel",pargp="wel")
+
+        rfiles = [f for f in os.listdir(pf.new_d) if "rcha_recharge_" in f and f.endswith(".txt")]
+        valid_rfiles = []
+        for rfile in rfiles:
+            kper = int(rfile.split("_")[-1].split('.')[0])
+            if kper > sim.tdis.nper.data:
+                os.remove(os.path.join(pf.new_d,rfile)) #flopy stupidity...
+                continue
+            print(rfile)
+            valid_rfiles.append(rfile)
+        assert len(valid_rfiles) == sim.tdis.nper.data,len(valid_rfiles)  
+        pf.add_parameters(rfiles,par_type="grid",upper_bound=1.2,lower_bound=0.8,par_name_base="rch",pargp="rch",
+            geostruct=rch_gs)
+
+        pf.add_parameters("freyberg6.ghb_stress_period_data_1.txt",par_type="constant",par_style="a",index_cols=[0,1,2],
+            use_cols=[3],par_name_base="ghbstage",pargp="ghbstage",upper_bound=0.5,lower_bound=-0.5,transform="none",
+            mfile_sep=" ",mfile_skip=0)
+
     else:
         pf.mod_py_cmds.append("print('model')")
     pf.add_py_function("workflow.py",
@@ -324,8 +360,9 @@ def apply_pps():
     gridspec_fname = "grid.spc"
     for model_file,pp_file in zip(df.model_file,df.pp_file):
         ppdf = pd.read_csv(pp_file)
-        interp = helpers.interpolate_with_sva_pilotpoints_2d(ppdf,gridspec_fname,vartransform="log")
+        results = helpers.interpolate_with_sva_pilotpoints_2d(ppdf,gridspec_fname,vartransform="log")
         org_arr = np.loadtxt(model_file)
+        interp = results["result"]
         interp = interp.reshape(org_arr.shape)
         new_arr = org_arr * interp
         new_arr[new_arr<1.0e-10] = 1.0e-10
@@ -711,7 +748,7 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
             f.write("gage,1e-20\n")
 
             
-        pst.pestpp_options["ies_phi_factor_file"] = "phi_joint.csv"
+        #pst.pestpp_options["ies_phi_factor_file"] = "phi_joint.csv"
 
     #noise = np.random.normal(0,2,(1000,len(hk_nznames)))
 
@@ -788,12 +825,14 @@ def build_localizer(t_d):
     obs = pst.observation_data.loc[pst.nnz_obs_names,:].copy()
     print(par.pname.unique())
     print(obs.oname.unique())
+
     onames = set(obs.oname.unique())
     #par = par.loc[par.pname.apply(lambda x: x in onames)]
     ogp = obs.obgnme.unique()
     ogp.sort()
     pgp = par.pargp.unique()
     pgp.sort()
+    print(pgp)
     df = pd.DataFrame(index=ogp,columns=pgp,dtype=float)
     df.loc[:,:] = 0.0
     
@@ -1166,7 +1205,7 @@ if __name__ == "__main__":
     num_reals = 100
     num_workers = 10
 
-    daily_to_monthly()
+    #daily_to_monthly()
     
     #ensemble_stacking_experiment()
     #exit()
@@ -1174,12 +1213,11 @@ if __name__ == "__main__":
     # setup the pest interface for conditioning realizations
     setup_interface("freyberg_monthly",num_reals=num_reals,full_interface=True,include_constants=True,
        binary_pe=True)
-    
-    #run_a_real("monthly_master_cond",real_name="65",pe_fname="freyberg.0.par.jcb")
-    #exit()
-    
-    # run for truth...
     t_d = "monthly_template"
+    
+    #run_a_real(t_d)
+    ## run for truth...
+    
     truth_m_d = "monthly_truth_prior_master"
     run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
 
@@ -1189,7 +1227,10 @@ if __name__ == "__main__":
    
     # setup the localizer matrix
     build_localizer(t_d)
-    
+  
+    nophi_m_d = "master_nophi"
+    run(t_d,m_d=nophi_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
+    exit()    
 
     joint_m_d = "master_joint"
     run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_joint.csv")
@@ -1200,23 +1241,36 @@ if __name__ == "__main__":
     direct_m_d = "master_direct"
     run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_direct.csv")
 
-    make_kickass_figs(joint_m_d,post_noptmax=noptmax)
-    processing.plot_results_pub(joint_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
-    processing.plot_histo_pub(joint_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
-    processing.plot_histo(joint_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
-    processing.plot_par_changes(joint_m_d,noptmax=noptmax)
+    for m_d in [nophi_m_d,joint_m_d,direct_m_d,state_m_d]:
+        make_kickass_figs(m_d,post_noptmax=noptmax)
+        processing.plot_results_pub(m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
+        processing.plot_histo_pub(m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+        processing.plot_histo(m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+        processing.plot_par_changes(m_d,noptmax=noptmax)
 
-    make_kickass_figs(state_m_d,post_noptmax=noptmax)
-    processing.plot_results_pub(state_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
-    processing.plot_histo_pub(state_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
-    processing.plot_histo(state_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
-    processing.plot_par_changes(state_m_d,noptmax=noptmax)
+    # make_kickass_figs(nophi_m_d,post_noptmax=noptmax)
+    # processing.plot_results_pub(nophi_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
+    # processing.plot_histo_pub(nophi_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+    # processing.plot_histo(nophi_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+    # processing.plot_par_changes(nophi_m_d,noptmax=noptmax)
 
-    make_kickass_figs(direct_m_d,post_noptmax=noptmax)
-    processing.plot_results_pub(direct_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
-    processing.plot_histo_pub(direct_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
-    processing.plot_histo(direct_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
-    processing.plot_par_changes(direct_m_d,noptmax=noptmax)
+    # make_kickass_figs(joint_m_d,post_noptmax=noptmax)
+    # processing.plot_results_pub(joint_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
+    # processing.plot_histo_pub(joint_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+    # processing.plot_histo(joint_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+    # processing.plot_par_changes(joint_m_d,noptmax=noptmax)
+
+    # make_kickass_figs(state_m_d,post_noptmax=noptmax)
+    # processing.plot_results_pub(state_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
+    # processing.plot_histo_pub(state_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+    # processing.plot_histo(state_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+    # processing.plot_par_changes(state_m_d,noptmax=noptmax)
+
+    # make_kickass_figs(direct_m_d,post_noptmax=noptmax)
+    # processing.plot_results_pub(direct_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
+    # processing.plot_histo_pub(direct_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+    # processing.plot_histo(direct_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+    # processing.plot_par_changes(direct_m_d,noptmax=noptmax)
 
 
     # # now setup a corresponding interface that will actually run MODFLOW
