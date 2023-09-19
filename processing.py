@@ -521,9 +521,9 @@ def plot_histo(m_d, pstf="test_run", log_oe=True,noptmax=None):
     obs = obs.loc[obs.otype == "arr"]
     obs.loc[:, "i"] = obs.i.astype(int)
     obs.loc[:, "j"] = obs.j.astype(int)
-
-    with PdfPages(os.path.join("histo_results_si.pdf")) as pdf:
-        for name in obs.loc[pst.nnz_obs_names].sort_values(['i', 'j']).index:
+    nz_names = obs.loc[obs.weight>0,"obsnme"].to_list()
+    with PdfPages(os.path.join(m_d,"histo_results_si.pdf")) as pdf:
+        for name in obs.loc[nz_names].sort_values(['i', 'j']).index:
             if "dup" in name:
                 continue
             print(name)
@@ -639,7 +639,7 @@ def plot_histo_pub(m_d, pstf="test_run", log_oe=True, noptmax=None,
             ax.legend()
         ax_count += 1
     plt.tight_layout()
-    plt.savefig("prop_histo_pub.pdf")
+    plt.savefig(os.path.join(m_d,"prop_histo_pub.pdf"))
     plt.close(fig)
 
 
@@ -707,7 +707,7 @@ def plot_results_pub(m_d, ardim=None, pstf="test_run", log_oe=True,noptmax=None)
     onames.sort()
     print(onames)
     ax_count = 0
-    with PdfPages("results_pub_si.pdf") as pdf:
+    with PdfPages(os.path.join(m_d,"results_pub_si.pdf")) as pdf:
         for oname in onames:
             fig, axes = plt.subplots(2, 4, figsize=(14,8.4))
             # cheating to get layer from oname
@@ -922,7 +922,7 @@ def plot_par_changes(m_d,noptmax=None,include_insample=False):
             ax.set_yticks([])
             #ax.set_xlabel()
     plt.tight_layout()
-    plt.savefig("par_change.pdf")
+    plt.savefig(os.path.join(m_d,"par_change.pdf"))
     plt.close(fig)
 
 

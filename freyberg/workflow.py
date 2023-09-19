@@ -355,7 +355,7 @@ def run(t_d,num_workers=5,num_reals=100,noptmax=-1,m_d=None,init_lam=None,mm_alp
                                  port=4199)
     return m_d
 
-def make_kickass_figs(m_d_c = "master_flow_prior",m_d_f = "master_flow_post",
+def make_kickass_figs(m_d,post_noptmax=None,
                       plt_name="histo_compare_pub.pdf"):
 
     unit_dict = {"head": "sw-gw flux $\\frac{ft^3}{d}$",
@@ -368,27 +368,30 @@ def make_kickass_figs(m_d_c = "master_flow_prior",m_d_f = "master_flow_post",
                   "trgw_2_101_23": "gw_2",
                   "gage": "sw_1"}
 
+
     #sim = flopy.mf6.MFSimulation.load(sim_ws=m_d_f)
     #m = sim.get_model("freyberg6")
     #redis_fac = m.dis.nrow.data / 40
     #redis_fac = 3
 
-    pst = pyemu.Pst(os.path.join(m_d_c,"freyberg.pst"))
+    pst = pyemu.Pst(os.path.join(m_d,"freyberg.pst"))
     obs = pst.observation_data
     obs = obs.loc[obs.otype=="lst",:]
     obs.loc[:,"time"] = obs.time.astype(float)
     grps = obs.obgnme.unique()
     grps.sort()
+    if post_noptmax is None:
+        post_noptmax = pst.control_data.noptmax
 
-    hw_fore = obs.loc[obs.apply(lambda x: x.time==700. and "headwater" in x.obsnme,axis=1),"obsnme"]
+    hw_fore = obs.loc[obs.apply(lambda x: x.time==22. and "headwater" in x.obsnme,axis=1),"obsnme"]
     assert hw_fore.shape[0] == 1
-    lay1_fore = obs.loc[obs.apply(lambda x: x.time==700. and "trgw_0_80_20" in x.obsnme,axis=1),"obsnme"]
+    lay1_fore = obs.loc[obs.apply(lambda x: x.time==22. and "trgw-0-80-20" in x.obsnme,axis=1),"obsnme"]
     assert lay1_fore.shape[0] == 1
-    lay3_fore = obs.loc[obs.apply(lambda x: x.time == 700. and "trgw_2_80_20" in x.obsnme, axis=1), "obsnme"]
+    lay3_fore = obs.loc[obs.apply(lambda x: x.time == 22. and "trgw-2-80-20" in x.obsnme, axis=1), "obsnme"]
     assert lay3_fore.shape[0] == 1
 
-    oe_pr = pyemu.ObservationEnsemble.from_binary(pst=pst,filename=os.path.join(m_d_c,"freyberg.0.obs.jcb"))
-    oe_pt= pyemu.ObservationEnsemble.from_binary(pst=pst,filename=os.path.join(m_d_f,"freyberg.0.obs.jcb"))
+    oe_pr = pyemu.ObservationEnsemble.from_binary(pst=pst,filename=os.path.join(m_d,"freyberg.0.obs.jcb"))
+    oe_pt= pyemu.ObservationEnsemble.from_binary(pst=pst,filename=os.path.join(m_d,"freyberg.{0}.obs.jcb".format(post_noptmax)))
 
     fig,axes = plt.subplots(1,3,figsize=(8,3))
     titles = ["A) layer 1 groundwater level","B) layer 3 groundwater level","C) headwater exchange flux"]
@@ -400,8 +403,12 @@ def make_kickass_figs(m_d_c = "master_flow_prior",m_d_f = "master_flow_post",
         ax.set_ylabel("probability density")
         ax.set_xlabel(label)
         ax.set_title(title,loc="left")
+        tval = float(obs.loc[fore,"truth_val"])
+        ylim = ax.get_ylim()
+        ax.plot([tval,tval],ylim,"r--",lw=3)
+        ax.set_ylim(ylim)
     plt.tight_layout()
-    plt.savefig(plt_name)
+    plt.savefig(os.path.join(m_d,plt_name))
     plt.close(fig)
 
     def namer(name):
@@ -419,18 +426,23 @@ def make_kickass_figs(m_d_c = "master_flow_prior",m_d_f = "master_flow_post",
             full_name = "surface-water flow"
         return full_name
 
-    forecasts = ["trgw_0_80_20","trgw_2_80_20","headwater"]
-    with PdfPages("flow_results_si.pdf") as pdf:
+    forecasts = ["trgw-0-80-20","trgw-2-80-20","headwater"]
+    with PdfPages(os.path.join(m_d,"flow_results_si.pdf")) as pdf:
         ax_count = 0
         #for grp in grps:
         for fore,title,label in zip(forecasts,titles, labels):
             gobs = obs.loc[obs.obsnme.str.contains(fore),:].copy()
+            print(gobs)
+            assert gobs.shape[0] > 0
             gobs.sort_values(by="time",inplace=True)
             fig,ax = plt.subplots(1,1,figsize=(8,4))
             gtime = gobs.time.values.copy()
             gnames = gobs.obsnme.values.copy()
             [ax.plot(gtime,oe_pr.loc[i,gnames].values,"0.5",lw=0.1,alpha=0.5) for i in oe_pr.index]
             [ax.plot(gtime, oe_pt.loc[i, gnames].values, "b", lw=0.1,alpha=0.5) for i in oe_pt.index]
+            ax.plot(gtime,gobs.truth_val.astype(float),"r--",lw=1.5)
+            ggobs = gobs.loc[gobs.weight>0,:]
+            ax.scatter(ggobs.time,ggobs.truth_val.astype(float),marker="^",s=20,c="r")
             ax.set_xlabel("time")
             ax.set_ylabel(label)
             ax.set_title("{0}".format(title),loc="left")
@@ -521,7 +533,7 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
         assert "gage" in usecols
         assert "headwater" in usecols
         assert "tailwater" in usecols
-        keep_usecols = ["trgw-0-74-14","trgw-2-74-14",
+        keep_usecols = ["trgw-0-65-32","trgw-2-65-32",
         "trgw-0-8-29","trgw-2-8-29","gage"]
         obs = pst.observation_data
         kobs = obs.loc[obs.usecol.apply(lambda x: x in keep_usecols),:].copy()
@@ -666,14 +678,29 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
     pst.pestpp_options['ies_observation_ensemble'] = "freyberg.obs+noise_0.jcb"
 
     if include_modflow_obs:
-        with open(os.path.join(t_d,"phi.csv"),'w') as f:
+        with open(os.path.join(t_d,"phi_joint.csv"),'w') as f:
             f.write("npf,0.35\n")
             f.write("sto,0.15\n")
             
             f.write("trgw,0.35\n")
             f.write("gage,0.15\n")
+        
+        with open(os.path.join(t_d,"phi_state.csv"),'w') as f:
+            f.write("npf,1e-20\n")
+            f.write("sto,1e-20\n")
             
-        pst.pestpp_options["ies_phi_factor_file"] = "phi.csv"
+            f.write("trgw,0.7\n")
+            f.write("gage,0.3\n")
+
+        with open(os.path.join(t_d,"phi_direct.csv"),'w') as f:
+            f.write("npf,0.7\n")
+            f.write("sto,0.3\n")
+            
+            f.write("trgw,1e-20\n")
+            f.write("gage,1e-20\n")
+
+            
+        pst.pestpp_options["ies_phi_factor_file"] = "phi_joint.csv"
 
     #noise = np.random.normal(0,2,(1000,len(hk_nznames)))
 
@@ -1124,7 +1151,11 @@ def daily_to_monthly(daily_d="freyberg_daily",monthly_d="freyberg_monthly"):
 if __name__ == "__main__":
 
 
-    #daily_to_monthly()
+    noptmax = 3
+    num_reals = 100
+    num_workers = 10
+
+    daily_to_monthly()
     #exit()
 
 
@@ -1132,38 +1163,57 @@ if __name__ == "__main__":
     #exit()
 
     # setup the pest interface for conditioning realizations
-    setup_interface("freyberg_monthly",num_reals=300,full_interface=True,include_constants=True,
+    setup_interface("freyberg_monthly",num_reals=num_reals,full_interface=True,include_constants=True,
        binary_pe=True)
     
     #run_a_real("monthly_master_cond",real_name="65",pe_fname="freyberg.0.par.jcb")
     #exit()
     
     # run for truth...
-    full_t_d = "monthly_template"
+    t_d = "monthly_template"
     truth_m_d = "monthly_truth_prior_master"
-    run(full_t_d,num_workers=10,num_reals=300,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
+    run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
 
     
-    #cond_t_d = "monthly_template"
-    #setup_interface("freyberg_monthly",num_reals=100,full_interface=True,include_constants=True,
-    #   binary_pe=True)
-    cond_t_d = full_t_d
-    
     # set the observed values and weights for the equality and inequality observations
-    set_obsvals_weights(cond_t_d,truth_m_d,include_modflow_obs=True)
+    set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
    
     # setup the localizer matrix
-    build_localizer(cond_t_d)
+    build_localizer(t_d)
     
     # # run PESTPP-IES to condition the realizations
-    noptmax = 10
-    m_d = "master_joint"
-    run(cond_t_d,m_d=m_d,num_workers=10,num_reals=300,noptmax=noptmax)
-    cond_m_d = m_d #"monthly_master_cond"
+  
+    joint_m_d = "master_joint"
+    run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_joint.csv")
     
+    state_m_d = "master_state"
+    run(t_d,m_d=state_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_state.csv")
+
+    direct_m_d = "master_direct"
+    run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_direct.csv")
+
+    make_kickass_figs(joint_m_d,post_noptmax=noptmax)
+    processing.plot_results_pub(joint_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
+    processing.plot_histo_pub(joint_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+    processing.plot_histo(joint_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+    processing.plot_par_changes(joint_m_d,noptmax=noptmax)
+
+    make_kickass_figs(state_m_d,post_noptmax=noptmax)
+    processing.plot_results_pub(state_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
+    processing.plot_histo_pub(state_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+    processing.plot_histo(state_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+    processing.plot_par_changes(state_m_d,noptmax=noptmax)
+
+    make_kickass_figs(direct_m_d,post_noptmax=noptmax)
+    processing.plot_results_pub(direct_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
+    processing.plot_histo_pub(direct_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+    processing.plot_histo(direct_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+    processing.plot_par_changes(direct_m_d,noptmax=noptmax)
+
+
     # # now setup a corresponding interface that will actually run MODFLOW
     # setup_interface("freyberg_daily",num_reals=500,full_interface=True,include_constants=True)
-    flow_t_d = "daily_template"
+    #flow_t_d = "daily_template"
     
     # # transfer the prior realizations from the previous conditioning analysis into the MODFLOW interace template
     # # so that we are using identical realizations
@@ -1184,11 +1234,12 @@ if __name__ == "__main__":
     #run(flow_t_d,num_workers=8,num_reals=100,noptmax=-1,m_d="master_flow_post")
     
     # now make all the figures for the manuscript
-    #make_kickass_figs()
+    
     #plot_mult(cond_t_d)
     #plot_domain()
-    processing.plot_results_pub(cond_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
-    processing.plot_histo_pub(cond_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
-    processing.plot_histo(cond_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
-    processing.plot_par_changes(cond_m_d)
+    # make_kickass_figs(joint_t_d,post_noptmax=8)
+    # processing.plot_results_pub(cond_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
+    # processing.plot_histo_pub(cond_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+    # processing.plot_histo(cond_m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
+    # processing.plot_par_changes(cond_m_d,noptmax=noptmax)
 
