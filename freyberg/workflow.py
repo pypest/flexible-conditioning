@@ -368,6 +368,7 @@ def make_kickass_figs(m_d,post_noptmax=None,
                   "trgw_2_101_23": "gw_2",
                   "gage": "sw_1"}
 
+    from scipy import stats
 
     #sim = flopy.mf6.MFSimulation.load(sim_ws=m_d_f)
     #m = sim.get_model("freyberg6")
@@ -399,6 +400,16 @@ def make_kickass_figs(m_d,post_noptmax=None,
     for ax,fore,title,label in zip(axes,[lay1_fore,lay3_fore,hw_fore],titles, labels):
         ax.hist(oe_pr.loc[:,fore],facecolor="0.5",edgecolor="none",alpha=0.5,density=True)
         ax.hist(oe_pt.loc[:,fore], facecolor="b", edgecolor="none", alpha=0.5,density=True)
+        
+        xmn,xmx = ax.get_xlim()
+        x = np.linspace(xmn,xmx,1000)
+        kde = stats.gaussian_kde(oe_pr.loc[:,fore].values.flatten())
+        ax.plot(x,kde(x),"0.5",lw=1.5)
+    
+        kde = stats.gaussian_kde(oe_pt.loc[:,fore].values.flatten())
+        ax.plot(x,kde(x),"b",lw=1.5)
+
+
         ax.set_yticks([])
         ax.set_ylabel("probability density")
         ax.set_xlabel(label)
@@ -1156,9 +1167,7 @@ if __name__ == "__main__":
     num_workers = 10
 
     daily_to_monthly()
-    #exit()
-
-
+    
     #ensemble_stacking_experiment()
     #exit()
 
@@ -1181,8 +1190,7 @@ if __name__ == "__main__":
     # setup the localizer matrix
     build_localizer(t_d)
     
-    # # run PESTPP-IES to condition the realizations
-  
+
     joint_m_d = "master_joint"
     run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_joint.csv")
     
