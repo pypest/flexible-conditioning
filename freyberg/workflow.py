@@ -50,8 +50,9 @@ else:
     raise Exception('***ERROR: OPERATING SYSTEM UNKNOWN***')
 
 
-def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=True,
+def setup_interface(org_ws,t_d=None,num_reals=100,full_interface=True,include_constants=True,
     grid_gs=None,pp_gs=None, dir_suffix="template",binary_pe=True, ppu_dir=os.path.join("..","..","..","pypestutils")):
+
 
     if os.path.exists(os.path.join(org_ws, mf_exe)):
         os.remove(os.path.join(org_ws, mf_exe))
@@ -98,10 +99,13 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
 
 
     # where the pest interface will be constructed
-    template_ws = org_ws.split('_')[1] + "_"+dir_suffix
-    if not full_interface:
-        template_ws += "_cond"
-    
+    if t_d is None:
+        template_ws = org_ws.split('_')[1] + "_"+dir_suffix
+        if not full_interface:
+            template_ws += "_cond"
+    else:
+        template_ws = t_d
+        
     
     # instantiate PstFrom object
     pf = pyemu.utils.PstFrom(original_d=org_ws, new_d=template_ws,
@@ -116,7 +120,7 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
 
     # the geostruct object for pilot-point-scale parameters
     if pp_gs is None:
-        pp_v = pyemu.geostats.ExpVario(contribution=1.0, a=5000)
+        pp_v = pyemu.geostats.ExpVario(contribution=1.0, a=2000)
         pp_gs = pyemu.geostats.GeoStruct(variograms=pp_v)
 
     # use the idomain array for masking parameter locations
@@ -128,9 +132,23 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
     ppdf = ppu.get_2d_pp_info_structured_grid(10,grid_fname)
     ppdf.loc[:,"value"] = 1.0
     ppdf.loc[:,"bearing"] = 180
-    ppdf.loc[:,"aniso"] = 10
+    jmin,jmax = ppdf.j.min(),float(ppdf.j.max())
+    ppdf.loc[:,"aniso"] = 20 * ppdf.j.values.copy() / jmax
+    ppdf.loc[ppdf.aniso<1,"aniso"] = 1
+    ppdf.loc[ppdf.aniso>20,"aniso"] = 20
+    cl = ppdf.corrlen.min()
+    ppdf.loc[:,"corrlen"] = cl * (ppdf.j.values.copy() / jmax)
+    ppdf.loc[ppdf.corrlen<cl/20,"corrlen"] = cl/20
     ppdf.loc[:,"x"] = np.round(ppdf.x.values,1)
     ppdf.loc[:,"y"] = np.round(ppdf.y.values,1)
+
+    y = np.cumsum(m.dis.delc.array)
+    phase = np.pi/4
+    gain = 30
+    iy = np.linspace(phase,10*np.pi+phase,y.shape[0])
+    ix = 180 + np.sin(iy) * gain
+    
+    ppdf.loc[:,"bearing"] = ix[ppdf.i.values]
 
 
     print("{0} pilot points".format(ppdf.shape[0]))
@@ -191,14 +209,17 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
             pppdf = ppdf.copy()
             base = arr_file.split('.')[1].replace("_","")+"_"
             pppdf.loc[:,"name"] = [base+n for n in pppdf.ppname.values]
-            pppdf.index = pppdf.name.values
+            pppdf.loc[:,"ppname"] = pppdf.name.values
             pp_file = os.path.join(pf.new_d,base+"pp.csv")
             pppdf.to_csv(pp_file,index=False)
             pp_files.append(os.path.split(pp_file)[1])
             mod_files.append(arr_file)
-            df = pf.add_parameters(os.path.split(pp_file)[1],par_type="grid",index_cols=["ppname","x","y"],use_cols=["value","bearing"],
-                par_name_base=[base+"pp"+base,base+"bearing"],pargp=[base+"_pp",base+"_bearing"],upper_bound=[ub*5,200],lower_bound=[lb/5,160],
-                par_style="direct",transform="log")
+            df = pf.add_parameters(os.path.split(pp_file)[1],par_type="grid",index_cols={"ppname":"ppname","x":"x","y":"y"},
+                use_cols=["value","bearing","aniso","corrlen"],
+                par_name_base=[base+"pp"+base,base+"bearing",base+"aniso",base+"corrlen"],
+                pargp=[base+"pp"+base,base+"bearing",base+"aniso",base+"corrlen"],
+                upper_bound=[ub*5,pppdf.bearing.max()*1.1,pppdf.aniso.max()*1.1,pppdf.corrlen.max()*1.1],lower_bound=[lb/5,pppdf.bearing.min()*.9,pppdf.aniso.min()*.9,pppdf.corrlen.min()*.9],
+                par_style="direct",transform="log",geostruct=pp_gs)
             df = df.loc[df.parnme.str.contains("bearing"),:]
             bearing_dfs.append(df)
             if include_constants:
@@ -296,17 +317,26 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
         use_specsim = False
     pe = pf.draw(num_reals, use_specsim=use_specsim)
 
-    par = pst.parameter_data
-    new_dfs = []
 
-    for bearing_df in bearing_dfs:
-        bearing_df.loc[:,"x"] = par.loc[bearing_df.parnme,"x"].astype(float)
-        bearing_df.loc[:,"y"] = par.loc[bearing_df.parnme,"y"].astype(float)
-        new_dfs.append(bearing_df)
-    bpe = pyemu.helpers.geostatistical_draws(pst=pst,struct_dict={pp_gs:new_dfs},num_reals=num_reals)
-    bpar = par.loc[par.parnme.str.contains("bearing"),"parnme"].values
-    pe.loc[:,bpar] = bpe.loc[:,bpar].values
+    # par = pst.parameter_data
+    # new_dfs = []
 
+    # for bearing_df in bearing_dfs:
+    #     bearing_df.loc[:,"x"] = par.loc[bearing_df.parnme,"x"].astype(float)
+    #     bearing_df.loc[:,"y"] = par.loc[bearing_df.parnme,"y"].astype(float)
+    #     new_dfs.append(bearing_df)
+    # bpe = pyemu.helpers.geostatistical_draws(pst=pst,struct_dict={pp_gs:new_dfs},num_reals=num_reals)
+    # bpar = par.loc[par.parnme.str.contains("bearing"),"parnme"].values
+    # pe.loc[:,bpar] = bpe.loc[:,bpar].values
+
+    # par = pst.parameter_data
+    # pp_par = par.loc[par.parnme.str.contains("_pp"),:].copy()
+    # assert pp_par.shape[0] > 0
+    # cov = pyemu.Cov.from_parameter_data(pst)
+    # uncor_pe = pyemu.ParameterEnsemble.from_gaussian_draw(pst=pst,cov=cov,num_reals=num_reals)
+    # pe._df.loc[:,pp_par.parnme] = uncor_pe._df.loc[:,pp_par.parnme].values
+    
+    pe.enforce
     if binary_pe:
         pe.to_binary(os.path.join(template_ws, "prior.jcb"))
     else:
@@ -328,6 +358,15 @@ def setup_interface(org_ws,num_reals=100,full_interface=True,include_constants=T
     assert os.path.exists(res_file), res_file
     pst.set_res(res_file)
     print(pst.phi)
+
+    pst.control_data.noptmax = -2
+    # write the control file
+    pst.write(os.path.join(pf.new_d, "freyberg.pst"),version=2)
+
+    # run with noptmax = 0
+    pyemu.os_utils.run("{0} freyberg.pst".format(
+        os.path.join("pestpp-ies")), cwd=pf.new_d)
+
 
     # if successful, set noptmax = -1 for prior-based Monte Carlo
     pst.control_data.noptmax = -1
@@ -610,7 +649,7 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
         obs.loc[kobs.obsnme,"observed"] = True
         obs.loc[kobs.loc[kobs.usecol.str.startswith("trgw"),"obsnme"],"standard_deviation"] = 1.0
         obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"standard_deviation"] = kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05
-        obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"weight"] = 1.0 /(kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05)
+        obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"weight"] = 0.0 #1.0 /(kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05)
         
     obs = obs.loc[obs.otype == "arr", :].copy()
     obs.loc[:, "i"] = obs.i.astype(int)
@@ -1226,11 +1265,12 @@ if __name__ == "__main__":
     #exit()
 
     # setup the pest interface for conditioning realizations
-    setup_interface("freyberg_monthly",num_reals=num_reals,full_interface=True,include_constants=True,
-       binary_pe=True)
     t_d = "monthly_template"
+    #setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,include_constants=True,
+    #   binary_pe=True)
     
     #run_a_real(t_d)
+    #exit()
     ## run for truth...
     
     truth_m_d = "monthly_truth_prior_master"
@@ -1238,29 +1278,32 @@ if __name__ == "__main__":
 
     
     # set the observed values and weights for the equality and inequality observations
-    set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
+    #set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
     
     # setup the localizer matrix
-    build_localizer(t_d)
+    #build_localizer(t_d)
   
+    #exit()
     #nophi_m_d = "master_nophi"
     #run(t_d,m_d=nophi_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
     
-    joint_m_d = "master_joint"
-    run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_joint.csv")
-    
-    state_m_d = "master_state"
-    run(t_d,m_d=state_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_state.csv")
-
     direct_m_d = "master_direct"
     run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_direct.csv")
 
+    state_m_d = "master_state"
+    run(t_d,m_d=state_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_state.csv")
+
+    joint_m_d = "master_joint"
+    run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_joint.csv")
+    
+    
+    
     for m_d in [joint_m_d,direct_m_d,state_m_d]:
         make_kickass_figs(m_d,post_noptmax=noptmax)
         processing.plot_results_pub(m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
         processing.plot_histo_pub(m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
         processing.plot_histo(m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
-        processing.plot_par_changes(m_d,noptmax=noptmax)
+        #processing.plot_par_changes(m_d,noptmax=noptmax)
 
     # make_kickass_figs(nophi_m_d,post_noptmax=noptmax)
     # processing.plot_results_pub(nophi_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
