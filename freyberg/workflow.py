@@ -544,7 +544,22 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
 
     tpst = pyemu.Pst(os.path.join(truth_m_d,"freyberg.pst"))
     toe = pyemu.ObservationEnsemble.from_binary(pst=tpst,filename=os.path.join(truth_m_d,"freyberg.0.obs.jcb"))
-    truth_idx = 0
+    obs = tpst.observation_data
+    hobs = obs.loc[obs.obsnme.str.contains("headwater"),:].copy()
+    assert hobs.shape[0] > 0
+    hoe = toe.loc[:,hobs.obsnme]
+    tote = hoe.sum(axis=1)
+    q95 = np.percentile(tote.values,97)
+    q95d = (tote - q95).apply(np.abs)
+    truth_idx = q95d.argmin()
+    #fig,ax = plt.subplots(1,1)
+    #ax.hist(tote.values,bins=30)
+    #ylim = ax.get_ylim()
+    #ax.plot([tote[truth_idx],tote[truth_idx]],ylim,"r--")
+    #plt.show()
+    #print(truth_idx,tote.iloc[truth_idx])
+    #exit()
+    #truth_idx = 0
     truth_real = toe.index[truth_idx]
     truth = toe.loc[toe.index[truth_idx],:].to_dict()
     #lines = open(os.path.join(t_d,"freyberg6.obs"),'r').readlines()
@@ -1219,19 +1234,18 @@ if __name__ == "__main__":
     ## run for truth...
     
     truth_m_d = "monthly_truth_prior_master"
-    run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
+    #run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
 
     
     # set the observed values and weights for the equality and inequality observations
     set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
-   
+    
     # setup the localizer matrix
     build_localizer(t_d)
   
-    nophi_m_d = "master_nophi"
-    run(t_d,m_d=nophi_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
-    exit()    
-
+    #nophi_m_d = "master_nophi"
+    #run(t_d,m_d=nophi_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
+    
     joint_m_d = "master_joint"
     run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_joint.csv")
     
@@ -1241,7 +1255,7 @@ if __name__ == "__main__":
     direct_m_d = "master_direct"
     run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_direct.csv")
 
-    for m_d in [nophi_m_d,joint_m_d,direct_m_d,state_m_d]:
+    for m_d in [joint_m_d,direct_m_d,state_m_d]:
         make_kickass_figs(m_d,post_noptmax=noptmax)
         processing.plot_results_pub(m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
         processing.plot_histo_pub(m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)

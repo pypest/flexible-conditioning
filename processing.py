@@ -468,10 +468,17 @@ def plot_results(m_d, ardim=None, pstf="test_run", log_oe=True,noptmax=None):
 def namer(name):
     raw = name.split("_")[0]
     print(raw)
+    if raw == "ghbstage":
+        return "ghb stage"
+    if raw == "wel":
+        return "well flux"
+    if raw == "rch":
+        return "recharge"
+    if raw == "sfrk":
+        return "sfr k"
     if ":" in raw:
         raw = raw.split(":")[1]
     try:
-
         layer = int(raw[-1])
     except Exception as e:
         print(name)
@@ -912,13 +919,20 @@ def plot_par_changes(m_d,noptmax=None,include_insample=False):
         ppar = par.loc[par.pname==pname,:].copy()
         grps = ppar.pargp.unique()
         grps.sort()
+        if pname in ["wel","rch","ghbstage","sfrk"]:
+            continue
         
         for jcol,grp in enumerate(grps):
             gpar = ppar.loc[ppar.pargp==grp,:]
+            pr_vals = pr.loc[:,gpar.parnme].values.flatten()
+            pt_vals = pt.loc[:,gpar.parnme].values.flatten()
+            if gpar.partrans.iloc[0] == "log":
+                pr_vals = np.log10(pr_vals)
+                pt_vals = np.log10(pt_vals)
             ax = axes[irow,jcol]
-            ax.hist(pr.loc[:,gpar.parnme].apply(np.log10).values.flatten(),facecolor="0.5",edgecolor="none",alpha=0.5,density=True)
-            ax.hist(pt.loc[:, gpar.parnme].apply(np.log10).values.flatten(), facecolor="b", edgecolor="none", alpha=0.5,density=True)
-            ax.set_title("{0} {1}, {2} parameters".format(namer(pname),tdict[grp.split("_")[-1]],gpar.shape[0]),loc="left")
+            ax.hist(pr_vals,facecolor="0.5",edgecolor="none",alpha=0.5,density=True)
+            ax.hist(pt_vals, facecolor="b", edgecolor="none", alpha=0.5,density=True)
+            ax.set_title("{0} {1}, {2} parameters".format(namer(pname),tdict.get(grp.split("_")[-1],grp),gpar.shape[0]),loc="left")
             ax.set_yticks([])
             #ax.set_xlabel()
     plt.tight_layout()
