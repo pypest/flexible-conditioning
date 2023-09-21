@@ -129,25 +129,28 @@ def setup_interface(org_ws,t_d=None,num_reals=100,full_interface=True,include_co
     sr = ppu.SpatialReference(delr=m.dis.delr.array,delc=m.dis.delc.array,xul=0,yul=np.cumsum(m.dis.delc.array)[-1])
     grid_fname = os.path.join(pf.new_d,"grid.spc")
     sr.write_gridspec(grid_fname)
+    # get pp dataframe
     ppdf = ppu.get_2d_pp_info_structured_grid(10,grid_fname)
+    # initial pp val
     ppdf.loc[:,"value"] = 1.0
-    ppdf.loc[:,"bearing"] = 180
+    # set aniso to be a function of column value
+    # stronger aniso near the sfr network
     jmin,jmax = ppdf.j.min(),float(ppdf.j.max())
     ppdf.loc[:,"aniso"] = 20 * ppdf.j.values.copy() / jmax
     ppdf.loc[ppdf.aniso<1,"aniso"] = 1
     ppdf.loc[ppdf.aniso>20,"aniso"] = 20
+    # same for corr len - longer correlations near sfr
     cl = ppdf.corrlen.min()
     ppdf.loc[:,"corrlen"] = cl * (ppdf.j.values.copy() / jmax)
     ppdf.loc[ppdf.corrlen<cl/20,"corrlen"] = cl/20
     ppdf.loc[:,"x"] = np.round(ppdf.x.values,1)
     ppdf.loc[:,"y"] = np.round(ppdf.y.values,1)
-
+    #set bearing to be a high-freq sin wave in the sfr direction
     y = np.cumsum(m.dis.delc.array)
     phase = np.pi/4
     gain = 30
     iy = np.linspace(phase,10*np.pi+phase,y.shape[0])
-    ix = 180 + np.sin(iy) * gain
-    
+    ix = 180 + np.sin(iy) * gain 
     ppdf.loc[:,"bearing"] = ix[ppdf.i.values]
 
 
@@ -777,7 +780,7 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
     pyemu.ObservationEnsemble(pst, df).to_binary(
         os.path.join(t_d, "freyberg.obs+noise_0.jcb")
     )
-    pst.pestpp_options['ies_observation_ensemble'] = "freyberg.obs+noise_0.jcb"
+    pst.pestpp_options['ies_obs_en'] = "freyberg.obs+noise_0.jcb"
 
     if include_modflow_obs:
         with open(os.path.join(t_d,"phi_joint.csv"),'w') as f:
@@ -1251,6 +1254,50 @@ def daily_to_monthly(daily_d="freyberg_daily",monthly_d="freyberg_monthly"):
     pyemu.os_utils.run("mf6",cwd=monthly_d)
 
 
+def prep_sequential(t_d,direct_m_d,noptmax=None,new_t_d=None):
+
+    dpst = pyemu.Pst(os.path.join(direct_m_d,"freyberg.pst"))
+    if noptmax is None:
+        noptmax = dpst.control_data.noptmax
+    if new_t_d is None:
+        new_t_d = t_d + "_seqstate"
+    dpe_fname = os.path.join(direct_m_d,"freyberg.{0}.par.jcb".format(noptmax))
+    doe_fname = os.path.join(direct_m_d,"freyberg.{0}.obs.jcb".format(noptmax))
+    noise_fname = os.path.join(direct_m_d,"freyberg.obs+noise.jcb")
+
+    if os.path.exists(new_t_d):
+        shutil.rmtree(new_t_d)
+    shutil.copytree(t_d,new_t_d)
+    pst = pyemu.Pst(os.path.join(new_t_d,"freyberg.pst"))
+    new_pe_fname = "prior_seq.jcb"
+    shutil.copy(dpe_fname,os.path.join(new_t_d,new_pe_fname))
+    pst.pestpp_options["ies_par_en"] = new_pe_fname
+    obs = pst.observation_data
+    aobs = obs.loc[obs.otype=="arr",:]
+    doe = pyemu.ObservationEnsemble.from_binary(pst=dpst,filename=doe_fname)
+    shutil.copy2(doe_fname,os.path.join(new_t_d,"restart_obs.jcb"))
+    pst.pestpp_options["ies_restart_obs_en"] = "restart_obs.jcb"
+
+
+    noise = pyemu.ObservationEnsemble.from_binary(pst=dpst,filename=noise_fname)
+    noise = noise.loc[doe.index,:]
+    noise.loc[:,aobs.obsnme] = doe.loc[:,aobs.obsnme].values
+    noise.to_binary(os.path.join(new_t_d,"restart_noise.jcb"))
+    pst.pestpp_options["ies_obs_en"] = "restart_noise.jcb"
+
+    with open(os.path.join(new_t_d,"phi_seq.csv"),'w') as f:
+        f.write("trgw,0.9\n")
+        f.write("npf,0.07\n")
+        f.write("sto,0.03\n")
+    pst.pestpp_options["ies_phi_factor_file"] = "phi_seq.csv"
+
+    pst.control_data.noptmax = -2
+    pst.write(os.path.join(new_t_d,"freyberg.pst"),version=2)
+    pyemu.os_utils.run("pestpp-ies freyberg.pst",cwd=new_t_d)
+    return new_t_d
+
+
+
 
 if __name__ == "__main__":
 
@@ -1288,17 +1335,22 @@ if __name__ == "__main__":
     #run(t_d,m_d=nophi_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
     
     direct_m_d = "master_direct"
-    run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_direct.csv")
+    #run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_direct.csv")
 
     state_m_d = "master_state"
-    run(t_d,m_d=state_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_state.csv")
+    #run(t_d,m_d=state_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_state.csv")
 
     joint_m_d = "master_joint"
-    run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_joint.csv")
+    #run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_joint.csv")
+    
+    #now for sequential
+    seq_t_d = prep_sequential(t_d,direct_m_d)
+
+    seq_m_d = "master_seq"
+    run(seq_t_d,m_d=seq_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_seq.csv")
     
     
-    
-    for m_d in [joint_m_d,direct_m_d,state_m_d]:
+    for m_d in [seq_m_d,direct_m_d,state_m_d,joint_m_d]:
         make_kickass_figs(m_d,post_noptmax=noptmax)
         processing.plot_results_pub(m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
         processing.plot_histo_pub(m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
