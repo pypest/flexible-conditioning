@@ -435,7 +435,7 @@ def run(t_d,num_workers=5,num_reals=100,noptmax=-1,m_d=None,init_lam=None,mm_alp
     return m_d
 
 def make_kickass_figs(m_d,post_noptmax=None,
-                      plt_name="histo_compare_pub.pdf"):
+                      plt_name="histo_compare_pub.pdf",axes=None):
 
     unit_dict = {"head": "sw-gw flux $\\frac{ft^3}{d}$",
                  "tail": "sw-gw flux $\\frac{ft^3}{d}$",
@@ -473,7 +473,9 @@ def make_kickass_figs(m_d,post_noptmax=None,
     oe_pr = pyemu.ObservationEnsemble.from_binary(pst=pst,filename=os.path.join(m_d,"freyberg.0.obs.jcb"))
     oe_pt= pyemu.ObservationEnsemble.from_binary(pst=pst,filename=os.path.join(m_d,"freyberg.{0}.obs.jcb".format(post_noptmax)))
 
-    fig,axes = plt.subplots(1,3,figsize=(8,3))
+    fig = None
+    if axes is None:
+        fig,axes = plt.subplots(1,3,figsize=(8,3))
     titles = ["A) layer 1 groundwater level","B) layer 3 groundwater level","C) headwater exchange flux"]
     labels = ["meters","meters","$\\frac{meters}{day}$"]
     for ax,fore,title,label in zip(axes,[lay1_fore,lay3_fore,hw_fore],titles, labels):
@@ -493,13 +495,16 @@ def make_kickass_figs(m_d,post_noptmax=None,
         ax.set_ylabel("probability density")
         ax.set_xlabel(label)
         ax.set_title(title,loc="left")
-        tval = float(obs.loc[fore,"truth_val"])
+        tval = float(obs.loc[fore,"truth_val"].iloc[0])
         ylim = ax.get_ylim()
         ax.plot([tval,tval],ylim,"r--",lw=3)
         ax.set_ylim(ylim)
-    plt.tight_layout()
-    plt.savefig(os.path.join(m_d,plt_name))
-    plt.close(fig)
+    if fig is not None:
+        plt.tight_layout()
+        plt.savefig(os.path.join(m_d,plt_name))
+        plt.close(fig)
+    else:
+        return axes
 
     def namer(name):
         if "trgw" in name:
@@ -787,22 +792,22 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
             f.write("npf,0.35\n")
             f.write("sto,0.15\n")
             
-            f.write("trgw,0.35\n")
-            f.write("gage,0.15\n")
+            f.write("trgw,0.5\n")
+            #f.write("gage,0.15\n")
         
         with open(os.path.join(t_d,"phi_state.csv"),'w') as f:
             f.write("npf,1e-20\n")
             f.write("sto,1e-20\n")
             
-            f.write("trgw,0.7\n")
-            f.write("gage,0.3\n")
+            f.write("trgw,0.999\n")
+            #f.write("gage,0.3\n")
 
         with open(os.path.join(t_d,"phi_direct.csv"),'w') as f:
             f.write("npf,0.7\n")
             f.write("sto,0.3\n")
             
             f.write("trgw,1e-20\n")
-            f.write("gage,1e-20\n")
+            #f.write("gage,1e-20\n")
 
             
         #pst.pestpp_options["ies_phi_factor_file"] = "phi_joint.csv"
@@ -1286,9 +1291,9 @@ def prep_sequential(t_d,direct_m_d,noptmax=None,new_t_d=None):
     pst.pestpp_options["ies_obs_en"] = "restart_noise.jcb"
 
     with open(os.path.join(new_t_d,"phi_seq.csv"),'w') as f:
-        f.write("trgw,0.9\n")
-        f.write("npf,0.07\n")
-        f.write("sto,0.03\n")
+        f.write("trgw,0.999\n")
+        f.write("npf,1e-10\n")
+        f.write("sto,1e-10\n")
     pst.pestpp_options["ies_phi_factor_file"] = "phi_seq.csv"
 
     pst.control_data.noptmax = -2
@@ -1297,6 +1302,28 @@ def prep_sequential(t_d,direct_m_d,noptmax=None,new_t_d=None):
     return new_t_d
 
 
+def plot_forecast_combined(m_ds):
+
+    fig,axes = plt.subplots(len(m_ds),3,figsize=(11.5,8))
+    ax_count = 0
+    for i,m_d in enumerate(m_ds):
+        print(axes[i,:].shape)
+        axes[i,:] = make_kickass_figs(m_d,axes=axes[i,:])
+        for ax in axes[i,:]:
+            ax.set_title("{0}) {1} {2}".format(ascii_uppercase[ax_count],ax.get_title("left")[2:],m_d.split("_")[1]),loc="left")
+    for j in range(axes.shape[1]):
+        aaxes = axes[:,j]
+        mn = min([ax.get_xlim()[0] for ax in aaxes])
+        mx = max([ax.get_xlim()[1] for ax in aaxes])
+        [ax.set_xlim(mn,mx) for ax in aaxes]
+
+        mn = min([ax.get_ylim()[0] for ax in aaxes])
+        mx = max([ax.get_ylim()[1] for ax in aaxes])
+        [ax.set_ylim(mn,mx) for ax in aaxes]
+        
+
+    plt.tight_layout()
+    plt.show()
 
 
 if __name__ == "__main__":
@@ -1344,14 +1371,15 @@ if __name__ == "__main__":
     #run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_joint.csv")
     
     #now for sequential
-    seq_t_d = prep_sequential(t_d,direct_m_d)
+    #seq_t_d = prep_sequential(t_d,direct_m_d)
 
     seq_m_d = "master_seq"
-    run(seq_t_d,m_d=seq_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_seq.csv")
+    #run(seq_t_d,m_d=seq_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_seq.csv")
     
-    
+    plot_forecast_combined([seq_m_d,direct_m_d,state_m_d,joint_m_d])
+    exit()
     for m_d in [seq_m_d,direct_m_d,state_m_d,joint_m_d]:
-        make_kickass_figs(m_d,post_noptmax=noptmax)
+        #make_kickass_figs(m_d,post_noptmax=noptmax)
         processing.plot_results_pub(m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
         processing.plot_histo_pub(m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
         processing.plot_histo(m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
