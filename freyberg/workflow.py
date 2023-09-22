@@ -1323,67 +1323,67 @@ def plot_forecast_combined(m_ds):
         
 
     plt.tight_layout()
-    plt.show()
+    plt.savefig("combined_forecast.pdf")
 
 
 if __name__ == "__main__":
 
 
-    noptmax = 3
-    num_reals = 100
-    num_workers = 10
+    noptmax = 6
+    num_reals = 300
+    num_workers = 12
 
-    #daily_to_monthly()
+    daily_to_monthly()
     
     #ensemble_stacking_experiment()
     #exit()
 
     # setup the pest interface for conditioning realizations
     t_d = "monthly_template"
-    #setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,include_constants=True,
-    #   binary_pe=True)
+    setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,include_constants=True,
+       binary_pe=True)
     
     #run_a_real(t_d)
     #exit()
     ## run for truth...
     
     truth_m_d = "monthly_truth_prior_master"
-    #run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
+    run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
 
     
     # set the observed values and weights for the equality and inequality observations
-    #set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
+    set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
     
     # setup the localizer matrix
-    #build_localizer(t_d)
+    build_localizer(t_d)
   
     #exit()
-    #nophi_m_d = "master_nophi"
-    #run(t_d,m_d=nophi_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
+    nophi_m_d = "master_nophi"
+    run(t_d,m_d=nophi_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
     
     direct_m_d = "master_direct"
-    #run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_direct.csv")
+    run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_direct.csv")
 
     state_m_d = "master_state"
-    #run(t_d,m_d=state_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_state.csv")
+    run(t_d,m_d=state_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_state.csv")
 
     joint_m_d = "master_joint"
-    #run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_joint.csv")
+    run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_joint.csv")
     
     #now for sequential
-    #seq_t_d = prep_sequential(t_d,direct_m_d)
+    seq_t_d = prep_sequential(t_d,direct_m_d)
 
     seq_m_d = "master_seq"
-    #run(seq_t_d,m_d=seq_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_seq.csv")
+    run(seq_t_d,m_d=seq_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_seq.csv")
     
     plot_forecast_combined([seq_m_d,direct_m_d,state_m_d,joint_m_d])
-    exit()
+   
     for m_d in [seq_m_d,direct_m_d,state_m_d,joint_m_d]:
-        #make_kickass_figs(m_d,post_noptmax=noptmax)
+        make_kickass_figs(m_d,post_noptmax=noptmax)
         processing.plot_results_pub(m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
         processing.plot_histo_pub(m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
         processing.plot_histo(m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
-        #processing.plot_par_changes(m_d,noptmax=noptmax)
+        processing.plot_par_changes(m_d,noptmax=noptmax)
 
     # make_kickass_figs(nophi_m_d,post_noptmax=noptmax)
     # processing.plot_results_pub(nophi_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
