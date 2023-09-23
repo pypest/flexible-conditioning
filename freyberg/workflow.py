@@ -461,8 +461,8 @@ def make_kickass_figs(m_d,post_noptmax=None,
     grps = obs.obgnme.unique()
     grps.sort()
     if post_noptmax is None:
-        post_noptmax = pst.control_data.noptmax
-
+        phidf = pd.read_csv(os.path.join(m_d,"freyberg.phi.actual.csv"))
+        post_noptmax = int(phidf.iteration.values.max())
     hw_fore = obs.loc[obs.apply(lambda x: x.time==22. and "headwater" in x.obsnme,axis=1),"obsnme"]
     assert hw_fore.shape[0] == 1
     lay1_fore = obs.loc[obs.apply(lambda x: x.time==22. and "trgw-0-80-20" in x.obsnme,axis=1),"obsnme"]
@@ -1328,56 +1328,43 @@ def plot_forecast_combined(m_ds):
 
 if __name__ == "__main__":
 
-
-    noptmax = 6
-    num_reals = 300
-    num_workers = 12
-
-    daily_to_monthly()
-    
     #ensemble_stacking_experiment()
     #exit()
 
-    # setup the pest interface for conditioning realizations
+    noptmax = 4
+    num_reals = 300
+    num_workers = 12
+
     t_d = "monthly_template"
-    setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,include_constants=True,
-       binary_pe=True)
-    
-    #run_a_real(t_d)
-    #exit()
-    ## run for truth...
-    
     truth_m_d = "monthly_truth_prior_master"
-    run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
-
-    
-    # set the observed values and weights for the equality and inequality observations
-    set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
-    
-    # setup the localizer matrix
-    build_localizer(t_d)
-  
-    #exit()
     nophi_m_d = "master_nophi"
-    run(t_d,m_d=nophi_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
-    
     direct_m_d = "master_direct"
-    run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_direct.csv")
-
     state_m_d = "master_state"
-    run(t_d,m_d=state_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_state.csv")
-
     joint_m_d = "master_joint"
-    run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_joint.csv")
-    
-    #now for sequential
-    seq_t_d = prep_sequential(t_d,direct_m_d)
-
     seq_m_d = "master_seq"
-    run(seq_t_d,m_d=seq_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_seq.csv")
-    
-    plot_forecast_combined([seq_m_d,direct_m_d,state_m_d,joint_m_d])
+
+
+    # prep stuff
+    #daily_to_monthly()  
+    #setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,include_constants=True,
+    #   binary_pe=True)
+    #run_a_real(t_d)
+    #run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
+    #set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
+    #build_localizer(t_d)
+  
    
+    # run cases
+    #run(t_d,m_d=nophi_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
+    #run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_direct.csv")    
+    #run(t_d,m_d=state_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_state.csv")
+    #run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_joint.csv")
+    #seq_t_d = prep_sequential(t_d,direct_m_d)   
+    #run(seq_t_d,m_d=seq_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_seq.csv")
+    
+
+    #plotting
+    plot_forecast_combined([seq_m_d,direct_m_d,state_m_d,joint_m_d])
     for m_d in [seq_m_d,direct_m_d,state_m_d,joint_m_d]:
         make_kickass_figs(m_d,post_noptmax=noptmax)
         processing.plot_results_pub(m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
