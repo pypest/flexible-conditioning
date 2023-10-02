@@ -1331,8 +1331,8 @@ if __name__ == "__main__":
     #ensemble_stacking_experiment()
     #exit()
 
-    noptmax = 4
-    num_reals = 300
+    noptmax = 6
+    num_reals = 100
     num_workers = 12
 
     t_d = "monthly_template"
@@ -1358,14 +1358,18 @@ if __name__ == "__main__":
     #run(t_d,m_d=nophi_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
     #run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_direct.csv")    
     #run(t_d,m_d=state_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_state.csv")
-    #run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_joint.csv")
+    run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_joint.csv",ies_multimodal_alpha=0.99)
     #seq_t_d = prep_sequential(t_d,direct_m_d)   
     #run(seq_t_d,m_d=seq_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_seq.csv")
-    
+    jointmniter_m_d = "master_mniter_joint"
+    #run(t_d,m_d=jointmniter_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,
+    #    ies_phi_factor_file="phi_joint.csv",ies_multimodal_alpha=0.99,ies_n_iter_mean=2)
+    #exit()
 
     #plotting
-    plot_forecast_combined([seq_m_d,direct_m_d,state_m_d,joint_m_d])
-    for m_d in [seq_m_d,direct_m_d,state_m_d,joint_m_d]:
+    plot_forecast_combined([seq_m_d,direct_m_d,state_m_d,joint_m_d,jointmniter_m_d])
+    exit()
+    for m_d in [seq_m_d,direct_m_d,state_m_d,joint_m_d,jointmniter_m_d]:
         make_kickass_figs(m_d,post_noptmax=noptmax)
         processing.plot_results_pub(m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
         processing.plot_histo_pub(m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
