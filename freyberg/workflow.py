@@ -653,9 +653,10 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
         print(kobs)
         assert kobs.shape[0] == len(keep_usecols) * 12
         obs.loc[kobs.obsnme,"obsval"] = obs.loc[kobs.obsnme,"truth_val"].values
-        obs.loc[kobs.obsnme,"weight"] = 5
+        # gw level obs: sigma = 0.5, so weight = 2
+        obs.loc[kobs.obsnme,"weight"] = 2
         obs.loc[kobs.obsnme,"observed"] = True
-        obs.loc[kobs.loc[kobs.usecol.str.startswith("trgw"),"obsnme"],"standard_deviation"] = 1.0
+        obs.loc[kobs.loc[kobs.usecol.str.startswith("trgw"),"obsnme"],"standard_deviation"] = 0.5
         obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"standard_deviation"] = kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05
         obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"weight"] = 0.0 #1.0 /(kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05)
         
@@ -717,25 +718,33 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
     
     pst.observation_data.loc[hk_nznames, "obsval"] = vals
 
-    pst.observation_data.loc[hk_nznames, "lower_bound"] = vals - 2
-    pst.observation_data.loc[hk_nznames, "upper_bound"] = vals + 2
-    pst.observation_data.loc[hk_nznames, "weight"] = 1.0 + np.cumsum(np.ones(len(hk_nznames))+1)
+    # for hk equality type - distance between bounds in log space = 2, assuming 4 stdevs between bounds
+    # means weight = 1 / (2/4) = 2.0
+    pst.observation_data.loc[hk_nznames, "lower_bound"] = vals - 1
+    pst.observation_data.loc[hk_nznames, "upper_bound"] = vals + 1
+    pst.observation_data.loc[hk_nznames, "weight"] = 2.0 # + np.cumsum(np.ones(len(hk_nznames))+1)
 
     #vals = pst.observation_data.loc[hk_iq_nznames,"obsval"] - 0.5
-    vals = np.array([truth[n]+0.1 for n in hk_iq_nznames])
+    # less than hk ineq.  Enforce that values need to be less than truth value + 0.25 log cycle
+    # this implies that truth + 0.25 = upper 95% confidence (mean plus 2 sigma). 
+    # So weight = 1 / (0.25 / 2) = 8.0
+    vals = np.array([truth[n]+0.25 for n in hk_iq_nznames])
     pst.observation_data.loc[hk_iq_nznames, "obsval"] = vals
     #pst.observation_data.loc[hk_iq_nzname, "lower_bound"] = val - 1
     #pst.observation_data.loc[hk_iq_nzname, "upper_bound"] = val + 1
-    pst.observation_data.loc[hk_iq_nznames, "weight"] = 20.0
+    pst.observation_data.loc[hk_iq_nznames, "weight"] = 8.0
     pst.observation_data.loc[hk_iq_nznames, "obgnme"] = obs.loc[hk_iq_nznames,"oname"].apply(lambda x: "less_than_"+x)
     
     #vals = np.random.normal(1.5, 0.1, len(w_nznames))
     #vals = pst.observation_data.loc[w_nznames, "obsval"].values + vals
-    vals = np.array([truth[n] - 0.1 for n in w_nznames])
+    # greater than hk ineq.  Enforce that values need to be greater than truth value - 0.25 log cycle
+    # this implies that truth - 0.25 = lower 95% confidence (mean minus 2 sigma). 
+    # So weight = 1 / (0.25 / 2) = 8.0
+    vals = np.array([truth[n] - 0.25 for n in w_nznames])
     pst.observation_data.loc[w_nznames, "obsval"] = vals
     pst.observation_data.loc[w_nznames, "lower_bound"] = vals - 1
     pst.observation_data.loc[w_nznames, "upper_bound"] = vals + 1
-    pst.observation_data.loc[w_nznames, "weight"] = 10
+    pst.observation_data.loc[w_nznames, "weight"] = 8.0
     pst.observation_data.loc[w_nznames, "obgnme"] = obs.loc[w_nznames,"oname"].apply(lambda x: "greater_than_well_"+x)
 
     pst.observation_data.loc[:,"observed_value"] = pst.observation_data.obsval.values
@@ -746,25 +755,28 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
         dup_ss_nznames = [n.replace("sto","dup-sto") for n in ss_nznames]
         #vals = np.random.normal(0, 1.0, len(ss_nznames))
         #vals = pst.observation_data.loc[ss_nznames, "obsval"].values + vals
+        # ss double ineq.  We want values to be in range of truth +/- 0.25 log cycles.  
+        # this implies 0.5 log cycles covers the 95% CL range (mean +/ 2 sigma). 
+        # so weight = 1 / (0.5/4) = 
         vals = np.array([truth[n] for n in ss_nznames])
         pst.observation_data.loc[ss_nznames, "obsval"] = vals - 0.25
         pst.observation_data.loc[dup_ss_nznames, "obsval"] = vals + 0.25
         pst.observation_data.loc[ss_nznames, "obgnme"] = obs.loc[ss_nznames,"oname"].apply(lambda x: "greater_than_"+x)
         pst.observation_data.loc[dup_ss_nznames, "obgnme"] = obs.loc[dup_ss_nznames,"oname"].apply(lambda x: "less_than_"+x)
-        pst.observation_data.loc[ss_nznames, "weight"] = 10.0
-        pst.observation_data.loc[dup_ss_nznames, "weight"] = 10.0
+        pst.observation_data.loc[ss_nznames, "weight"] = 8.0
+        pst.observation_data.loc[dup_ss_nznames, "weight"] = 8.0
         pst.observation_data.loc[ss_nznames,"observed_value"] = vals
         pst.observation_data.loc[dup_ss_nznames, "observed_value"] = vals
 
     else:
-
+        raise NotImplementedError()
         #vals = pst.observation_data.loc[ss_nznames, "obsval"].values + vals
-        vals = np.array([truth[n] for n in ss_nznames])
-        pst.observation_data.loc[ss_nznames, "obsval"] = vals
-        pst.observation_data.loc[ss_nznames, "lower_bound"] = vals - 1.5
-        pst.observation_data.loc[ss_nznames, "upper_bound"] = vals + 1.5
-        pst.observation_data.loc[ss_nznames, "weight"] =  1.0 + np.cumsum(np.ones(len(ss_nznames))+1)
-        pst.observation_data.loc[ss_nznames, "observed_value"] = vals
+        # vals = np.array([truth[n] for n in ss_nznames])
+        # pst.observation_data.loc[ss_nznames, "obsval"] = vals
+        # pst.observation_data.loc[ss_nznames, "lower_bound"] = vals - 1.5
+        # pst.observation_data.loc[ss_nznames, "upper_bound"] = vals + 1.5
+        # pst.observation_data.loc[ss_nznames, "weight"] =  1.0 + np.cumsum(np.ones(len(ss_nznames))+1)
+        # pst.observation_data.loc[ss_nznames, "observed_value"] = vals
 
     nzobs = pst.observation_data.loc[pst.nnz_obs_names]
     mean_vals = pst.observation_data.loc[:,"obsval"]
@@ -1331,8 +1343,8 @@ if __name__ == "__main__":
     #ensemble_stacking_experiment()
     #exit()
 
-    noptmax = 4
-    num_reals = 300
+    noptmax = 6
+    num_reals = 100
     num_workers = 12
 
     t_d = "monthly_template"
@@ -1345,26 +1357,28 @@ if __name__ == "__main__":
 
 
     # prep stuff
-    #daily_to_monthly()  
-    #setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,include_constants=True,
-    #   binary_pe=True)
-    #run_a_real(t_d)
-    #run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
-    #set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
-    #build_localizer(t_d)
-  
+    daily_to_monthly()  
+    setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,include_constants=False,binary_pe=True)
+    run_a_real(t_d)
+    run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
+    set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
+    build_localizer(t_d)
+    exit()
    
-    # run cases
-    #run(t_d,m_d=nophi_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
-    #run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_direct.csv")    
-    #run(t_d,m_d=state_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_state.csv")
-    #run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_joint.csv")
+    # run cases - dont use phi factor file
+    #run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)#,ies_phi_factor_file="phi_direct.csv")    
+    #run(t_d,m_d=state_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)#,ies_phi_factor_file="phi_state.csv")
+    #run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)#,ies_phi_factor_file="phi_joint.csv",ies_multimodal_alpha=0.99,ies_n_iter_mean=-1)
     #seq_t_d = prep_sequential(t_d,direct_m_d)   
-    #run(seq_t_d,m_d=seq_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_seq.csv")
-    
-
+    #run(seq_t_d,m_d=seq_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)#,ies_phi_factor_file="phi_seq.csv")
+    #jointmniter_m_d = "master_mniter_joint"
+    #run(t_d,m_d=jointmniter_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,
+    #    ies_multimodal_alpha=0.99,ies_n_iter_mean=2)
+    #exit()
+    joint_m_d = "master_joint"
     #plotting
     plot_forecast_combined([seq_m_d,direct_m_d,state_m_d,joint_m_d])
+    exit()
     for m_d in [seq_m_d,direct_m_d,state_m_d,joint_m_d]:
         make_kickass_figs(m_d,post_noptmax=noptmax)
         processing.plot_results_pub(m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
