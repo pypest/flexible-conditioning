@@ -1357,14 +1357,13 @@ if __name__ == "__main__":
 
 
     # prep stuff
-    #daily_to_monthly()  
-    #setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,include_constants=True,
-    #   binary_pe=True)
-    #run_a_real(t_d)
-    #run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
+    daily_to_monthly()  
+    setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,include_constants=False,binary_pe=True)
+    run_a_real(t_d)
+    run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
     set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
-    #build_localizer(t_d)
-  
+    build_localizer(t_d)
+    exit()
    
     # run cases - dont use phi factor file
     #run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)#,ies_phi_factor_file="phi_direct.csv")    
@@ -1372,15 +1371,15 @@ if __name__ == "__main__":
     #run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)#,ies_phi_factor_file="phi_joint.csv",ies_multimodal_alpha=0.99,ies_n_iter_mean=-1)
     #seq_t_d = prep_sequential(t_d,direct_m_d)   
     #run(seq_t_d,m_d=seq_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)#,ies_phi_factor_file="phi_seq.csv")
-    jointmniter_m_d = "master_mniter_joint"
+    #jointmniter_m_d = "master_mniter_joint"
     #run(t_d,m_d=jointmniter_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,
     #    ies_multimodal_alpha=0.99,ies_n_iter_mean=2)
     #exit()
     joint_m_d = "master_joint"
     #plotting
-    plot_forecast_combined([seq_m_d,direct_m_d,state_m_d,joint_m_d,jointmniter_m_d])
+    plot_forecast_combined([seq_m_d,direct_m_d,state_m_d,joint_m_d])
     exit()
-    for m_d in [seq_m_d,direct_m_d,state_m_d,joint_m_d,jointmniter_m_d]:
+    for m_d in [seq_m_d,direct_m_d,state_m_d,joint_m_d]:
         make_kickass_figs(m_d,post_noptmax=noptmax)
         processing.plot_results_pub(m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
         processing.plot_histo_pub(m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
