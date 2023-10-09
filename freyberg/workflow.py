@@ -1312,7 +1312,7 @@ def prep_sequential(t_d,direct_m_d,noptmax=None,new_t_d=None):
 
     noise = pyemu.ObservationEnsemble.from_binary(pst=dpst,filename=noise_fname)
     noise = noise.loc[doe.index,:]
-    noise.loc[:,aobs.obsnme] = doe.loc[:,aobs.obsnme].values
+    #noise.loc[:,aobs.obsnme] = doe.loc[:,aobs.obsnme].values
     noise.to_binary(os.path.join(new_t_d,"restart_noise.jcb"))
     pst.pestpp_options["ies_obs_en"] = "restart_noise.jcb"
 
@@ -1357,7 +1357,7 @@ if __name__ == "__main__":
     #ensemble_stacking_experiment()
     #exit()
 
-    noptmax = 6
+    noptmax = 2
     num_reals = 100
     num_workers = 10
 
@@ -1369,26 +1369,28 @@ if __name__ == "__main__":
     joint_m_d = "master_joint"
     seq_m_d = "master_seq"
 
-
     # prep stuff
     # daily_to_monthly()  
-    #setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,include_constants=False,binary_pe=True)
+    setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,include_constants=False,binary_pe=True)
     
-    #run_a_real(t_d)
+    run_a_real(t_d)
     
-    #run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
+    run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
     
-    #set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
+    set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
     
-    #build_localizer(t_d)
+    build_localizer(t_d)
     
-    # run cases - dont use phi factor file
-    run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_direct.csv",ies_save_lambda_ensembles=True,save_binary=False)    
-    exit()
+    # run cases
+    run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_direct.csv")    
+    
     run(t_d,m_d=state_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_state.csv")
+    
     # no phi factor file here - just rely on the weights
     run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
+    
     seq_t_d = prep_sequential(t_d,direct_m_d)  
+    
     # no phi factor file here - just rely on the weights 
     run(seq_t_d,m_d=seq_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
     
@@ -1396,11 +1398,12 @@ if __name__ == "__main__":
     #run(t_d,m_d=jointmniter_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,
     #   ies_multimodal_alpha=0.99,ies_n_iter_mean=2)
     #exit()
-    #plotting
     
-    plot_forecast_combined([seq_m_d,direct_m_d,state_m_d,joint_m_d])
-    #exit()
-    for m_d in [seq_m_d,direct_m_d,state_m_d,joint_m_d]:
+    #plotting
+    m_ds = [direct_m_d,state_m_d,joint_m_d,seq_m_d]
+    #m_ds = [direct_m_d,state_m_d]
+    plot_forecast_combined(m_ds)
+    for m_d in m_ds:
         make_kickass_figs(m_d)
         processing.plot_results_pub(m_d, pstf="freyberg", log_oe=False)
         processing.plot_histo_pub(m_d, pstf="freyberg", log_oe=False)
