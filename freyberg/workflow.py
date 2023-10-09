@@ -1371,28 +1371,28 @@ if __name__ == "__main__":
 
     # prep stuff
     # daily_to_monthly()  
-    setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,include_constants=False,binary_pe=True)
+    #setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,include_constants=False,binary_pe=True)
     
-    run_a_real(t_d)
+    #run_a_real(t_d)
     
-    run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
+    #run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
     
-    set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
+    #set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
     
-    build_localizer(t_d)
+    #build_localizer(t_d)
     
     # run cases
-    run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_direct.csv")    
+    #run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_direct.csv")    
     
-    run(t_d,m_d=state_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_state.csv")
+    #run(t_d,m_d=state_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_state.csv")
     
     # no phi factor file here - just rely on the weights
-    run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
+    #run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
     
-    seq_t_d = prep_sequential(t_d,direct_m_d)  
+    #seq_t_d = prep_sequential(t_d,direct_m_d)  
     
     # no phi factor file here - just rely on the weights 
-    run(seq_t_d,m_d=seq_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
+    #run(seq_t_d,m_d=seq_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
     
     #jointmniter_m_d = "master_mniter_joint"
     #run(t_d,m_d=jointmniter_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,
@@ -1402,7 +1402,7 @@ if __name__ == "__main__":
     #plotting
     m_ds = [direct_m_d,state_m_d,joint_m_d,seq_m_d]
     #m_ds = [direct_m_d,state_m_d]
-    plot_forecast_combined(m_ds)
+    #plot_forecast_combined(m_ds)
     for m_d in m_ds:
         make_kickass_figs(m_d)
         processing.plot_results_pub(m_d, pstf="freyberg", log_oe=False)

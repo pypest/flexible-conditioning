@@ -479,7 +479,7 @@ def namer(name):
     if ":" in raw:
         raw = raw.split(":")[1]
     try:
-        layer = int(raw[-1])
+        layer = int(raw.replace("prop","")[-1])
     except Exception as e:
         print(name)
         raise Exception("error casting layer: "+str(e))
@@ -575,8 +575,8 @@ def plot_histo_pub(m_d, pstf="test_run", log_oe=True, noptmax=None,
     # names = ["oname:stosslayer3_otype:arr_i:8_j:47","oname:npfklayer1_otype:arr_i:101_j:23","oname:npfklayer3_otype:arr_i:8_j:47","oname:npfklayer3_otype:arr_i:79_j:31"]
     # units = ["$log_{10} \\frac{1}{m}$","$log_{10} \\frac{m}{d}$","$log_{10} \\frac{m}{d}$","$log_{10} \\frac{m}{d}$"]
 
-    names = ["oname:npfklayer3_otype:arr_i:8_j:47", "oname:npfklayer1_otype:arr_i:101_j:23",
-             "oname:npfklayer3_otype:arr_i:79_j:31", "oname:stosslayer1_otype:arr_i:29_j:5"]
+    names = ["oname:npfklayer3prop_otype:arr_i:8_j:47", "oname:npfklayer1prop_otype:arr_i:101_j:23",
+             "oname:npfklayer3prop_otype:arr_i:79_j:31", "oname:stosslayer1prop_otype:arr_i:29_j:5"]
     units = ["$log_{10} \\frac{m}{d}$", "$log_{10} \\frac{m}{d}$", "$log_{10} \\frac{m}{d}$", "$log_{10} \\frac{1}{m}$"]
 
     pst = pyemu.Pst(os.path.join(m_d, pstf+".pst"))
@@ -730,7 +730,7 @@ def plot_results_pub(m_d, ardim=None, pstf="test_run", log_oe=True,noptmax=None)
             #if "klayer3" not in oname and "klayer1" not in oname and "sslayer1" not in oname:
             #    continue
             print(oname)
-            k = int(oname[-1]) - 1
+            k = int(oname.replace("prop","")[-1]) - 1
             oobs = obs.loc[obs.oname==oname,:].copy()
 
             nzobs = oobs.loc[oobs.weight > 0]
