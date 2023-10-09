@@ -925,7 +925,7 @@ def build_localizer(t_d):
     
     obs.loc[:,"oname_dedup"] = obs.oname.apply(lambda x: x.replace("dup-",""))
     for name in onames:
-        ppar = par.loc[par.pname==name,:].copy()
+        ppar = par.loc[par.pname==name.replace("prop",""),:].copy()
         oobs = obs.loc[obs.oname_dedup==name,:].copy()
         ppgp = ppar.pargp.unique()
         ppgp.sort()
@@ -1372,16 +1372,16 @@ if __name__ == "__main__":
 
     # prep stuff
     # daily_to_monthly()  
-    setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,include_constants=False,binary_pe=True)
-    # #exit()
-    run_a_real(t_d)
-    #exit()
-    run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
-    set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
-    # #exit()
-    build_localizer(t_d)
-   
-   
+    #setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,include_constants=False,binary_pe=True)
+    
+    #run_a_real(t_d)
+    
+    #run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
+    
+    #set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
+    
+    #build_localizer(t_d)
+    
     # run cases - dont use phi factor file
     run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_direct.csv",ies_save_lambda_ensembles=True,save_binary=False)    
     exit()
