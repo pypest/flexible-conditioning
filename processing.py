@@ -511,7 +511,10 @@ def plot_histo(m_d, pstf="test_run", log_oe=True,noptmax=None):
 
     pst = pyemu.Pst(os.path.join(m_d, pstf+".pst"))
     if noptmax is None:
-        noptmax = pst.control_data.noptmax
+        #noptmax = pst.control_data.noptmax
+        phidf = pd.read_csv(os.path.join(m_d,"{0}.phi.actual.csv".format(pstf)))
+        noptmax = int(phidf.iteration.max())
+        print("using iteration",noptmax)
     pr_oe = pyemu.ObservationEnsemble.from_binary(pst=pst, filename=os.path.join(m_d, "{0}.0.obs.jcb".format(pstf)))
     pt_oe = pyemu.ObservationEnsemble.from_binary(pst=pst, filename=os.path.join(m_d, "{0}.{1}.obs.jcb". \
                                                                                  format(pstf,noptmax)))
@@ -578,7 +581,10 @@ def plot_histo_pub(m_d, pstf="test_run", log_oe=True, noptmax=None,
 
     pst = pyemu.Pst(os.path.join(m_d, pstf+".pst"))
     if noptmax is None:
-        noptmax = pst.control_data.noptmax
+        #noptmax = pst.control_data.noptmax
+        phidf = pd.read_csv(os.path.join(m_d,"{0}.phi.actual.csv".format(pstf)))
+        noptmax = int(phidf.iteration.max())
+        print("using iteration",noptmax)
     pr_oe = pyemu.ObservationEnsemble.from_binary(pst=pst, filename=os.path.join(m_d, "{0}.0.obs.jcb".format(pstf)))
     pt_oe = pyemu.ObservationEnsemble.from_binary(pst=pst, filename=os.path.join(m_d, "{0}.{1}.obs.jcb". \
                                                                                  format(pstf,noptmax)))
@@ -666,7 +672,10 @@ def plot_results_pub(m_d, ardim=None, pstf="test_run", log_oe=True,noptmax=None)
         nrow, ncol = ardim
     pst = pyemu.Pst(os.path.join(m_d, pstf+".pst"))
     if noptmax is None:
-        noptmax = pst.control_data.noptmax
+        #noptmax = pst.control_data.noptmax
+        phidf = pd.read_csv(os.path.join(m_d,"{0}.phi.actual.csv".format(pstf)))
+        noptmax = int(phidf.iteration.max())
+        print("using iteration",noptmax)
     try:
         pr_oe = pyemu.ObservationEnsemble.from_binary(
             pst=pst, filename=os.path.join(m_d,"{0}.0.obs.jcb".format(pstf))
@@ -903,7 +912,10 @@ def plot_par_changes(m_d,noptmax=None,include_insample=False):
     pst = pyemu.Pst(os.path.join(m_d,"freyberg.pst"))
     obs = pst.observation_data
     if noptmax is None:
-        noptmax = pst.control_data.noptmax
+        #noptmax = pst.control_data.noptmax
+        phidf = pd.read_csv(os.path.join(m_d,"freyberg.phi.actual.csv"))
+        noptmax = int(phidf.iteration.max())
+        print("using iteration",noptmax)
     pr = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(m_d,"freyberg.0.par.jcb"))
     pt = pyemu.ParameterEnsemble.from_binary(pst=pst, filename=os.path.join(m_d, "freyberg.{0}.par.jcb".format(noptmax)))
     commonidx = pr.index.intersection(pt.index)
@@ -913,8 +925,8 @@ def plot_par_changes(m_d,noptmax=None,include_insample=False):
     pnames = par.pname.unique()
     pnames.sort()
     
-    tdict = {"cn":"layer constant","pp":"pilot points","gr":"grid-scale","bearing":"bearing"}
-    fig,axes = plt.subplots(len(pnames),4,figsize=(11.5,8))
+    tdict = {"cn":"layer constant","pp":"pilot points","gr":"grid-scale","bearing":"bearing","aniso":"aniso","corrlen":"corrlen"}
+    fig,axes = plt.subplots(len(pnames),len(tdict),figsize=(11.5,8))
     for irow,pname in enumerate(pnames):
         ppar = par.loc[par.pname==pname,:].copy()
         grps = ppar.pargp.unique()
@@ -923,6 +935,7 @@ def plot_par_changes(m_d,noptmax=None,include_insample=False):
             continue
         
         for jcol,grp in enumerate(grps):
+            print(pname,grp)
             gpar = ppar.loc[ppar.pargp==grp,:]
             pr_vals = pr.loc[:,gpar.parnme].values.flatten()
             pt_vals = pt.loc[:,gpar.parnme].values.flatten()

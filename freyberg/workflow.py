@@ -77,9 +77,6 @@ def setup_interface(org_ws,t_d=None,num_reals=100,full_interface=True,include_co
 
     shutil.copytree(os.path.join(ppu_dir,"pypestutils"), os.path.join("pypestutils"))
 
-    
-
-
 
     # check that pypestutils is working
     from pypestutils.pestutilslib import PestUtilsLib
@@ -237,12 +234,12 @@ def setup_interface(org_ws,t_d=None,num_reals=100,full_interface=True,include_co
             np.savetxt(os.path.join(pf.new_d, f"log_dup_{arr_file}"),
                        np.log10(ar))
             pf.add_observations(filename=f"log_{arr_file}",
-                                obsgp=arr_file.split('.')[1].replace("_", ""),
-                                prefix=arr_file.split('.')[1].replace("_", ""))
+                                obsgp=arr_file.split('.')[1].replace("_", "")+"prop",
+                                prefix=arr_file.split('.')[1].replace("_", "")+"prop")
             if "_ss" in tag or "_sy" in tag:
                 pf.add_observations(filename=f"log_dup_{arr_file}",
-                                    obsgp="dup-"+arr_file.split('.')[1].replace("_", ""),
-                                    prefix="dup-"+arr_file.split('.')[1].replace("_", ""))
+                                    obsgp="dup-"+arr_file.split('.')[1].replace("_", "")+"prop",
+                                    prefix="dup-"+arr_file.split('.')[1].replace("_", "")+"prop")
 
 
     if full_interface:
@@ -416,6 +413,8 @@ def run(t_d,num_workers=5,num_reals=100,noptmax=-1,m_d=None,init_lam=None,mm_alp
     if m_d is None:
         m_d = t_d.replace("template","master")
     pst = pyemu.Pst(os.path.join(t_d,"freyberg.pst"))
+    # remove this if it exists...
+    pst.pestpp_options.pop("ies_phi_factor_file",None)
     pst.pestpp_options["ies_num_reals"] = num_reals
     pst.control_data.noptmax = noptmax
     if init_lam is not None:
@@ -654,9 +653,9 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
         assert kobs.shape[0] == len(keep_usecols) * 12
         obs.loc[kobs.obsnme,"obsval"] = obs.loc[kobs.obsnme,"truth_val"].values
         # gw level obs: sigma = 0.5, so weight = 2
-        obs.loc[kobs.obsnme,"weight"] = 2
+        obs.loc[kobs.obsnme,"weight"] = 0.5
         obs.loc[kobs.obsnme,"observed"] = True
-        obs.loc[kobs.loc[kobs.usecol.str.startswith("trgw"),"obsnme"],"standard_deviation"] = 0.5
+        obs.loc[kobs.loc[kobs.usecol.str.startswith("trgw"),"obsnme"],"standard_deviation"] = 2.0
         obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"standard_deviation"] = kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05
         obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"weight"] = 0.0 #1.0 /(kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05)
         
@@ -722,17 +721,17 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
     # means weight = 1 / (2/4) = 2.0
     pst.observation_data.loc[hk_nznames, "lower_bound"] = vals - 1
     pst.observation_data.loc[hk_nznames, "upper_bound"] = vals + 1
-    pst.observation_data.loc[hk_nznames, "weight"] = 2.0 # + np.cumsum(np.ones(len(hk_nznames))+1)
+    pst.observation_data.loc[hk_nznames, "weight"] = 4 # + np.cumsum(np.ones(len(hk_nznames))+1)
 
     #vals = pst.observation_data.loc[hk_iq_nznames,"obsval"] - 0.5
     # less than hk ineq.  Enforce that values need to be less than truth value + 0.25 log cycle
     # this implies that truth + 0.25 = upper 95% confidence (mean plus 2 sigma). 
     # So weight = 1 / (0.25 / 2) = 8.0
-    vals = np.array([truth[n]+0.25 for n in hk_iq_nznames])
+    vals = np.array([truth[n]+0.1 for n in hk_iq_nznames])
     pst.observation_data.loc[hk_iq_nznames, "obsval"] = vals
     #pst.observation_data.loc[hk_iq_nzname, "lower_bound"] = val - 1
     #pst.observation_data.loc[hk_iq_nzname, "upper_bound"] = val + 1
-    pst.observation_data.loc[hk_iq_nznames, "weight"] = 8.0
+    pst.observation_data.loc[hk_iq_nznames, "weight"] = 10.0
     pst.observation_data.loc[hk_iq_nznames, "obgnme"] = obs.loc[hk_iq_nznames,"oname"].apply(lambda x: "less_than_"+x)
     
     #vals = np.random.normal(1.5, 0.1, len(w_nznames))
@@ -740,11 +739,11 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
     # greater than hk ineq.  Enforce that values need to be greater than truth value - 0.25 log cycle
     # this implies that truth - 0.25 = lower 95% confidence (mean minus 2 sigma). 
     # So weight = 1 / (0.25 / 2) = 8.0
-    vals = np.array([truth[n] - 0.25 for n in w_nznames])
+    vals = np.array([truth[n] - 0.1 for n in w_nznames])
     pst.observation_data.loc[w_nznames, "obsval"] = vals
     pst.observation_data.loc[w_nznames, "lower_bound"] = vals - 1
     pst.observation_data.loc[w_nznames, "upper_bound"] = vals + 1
-    pst.observation_data.loc[w_nznames, "weight"] = 8.0
+    pst.observation_data.loc[w_nznames, "weight"] = 10.0
     pst.observation_data.loc[w_nznames, "obgnme"] = obs.loc[w_nznames,"oname"].apply(lambda x: "greater_than_well_"+x)
 
     pst.observation_data.loc[:,"observed_value"] = pst.observation_data.obsval.values
@@ -800,26 +799,39 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
     pst.pestpp_options['ies_obs_en'] = "freyberg.obs+noise_0.jcb"
 
     if include_modflow_obs:
-        with open(os.path.join(t_d,"phi_joint.csv"),'w') as f:
-            f.write("npf,0.35\n")
-            f.write("sto,0.15\n")
+        # with open(os.path.join(t_d,"phi_joint.csv"),'w') as f:
+        #     f.write("npf,0.35\n")
+        #     f.write("sto,0.15\n")
             
-            f.write("trgw,0.5\n")
-            #f.write("gage,0.15\n")
+        #     f.write("trgw,0.5\n")
+        #     #f.write("gage,0.15\n")
+        
+        # with open(os.path.join(t_d,"phi_state.csv"),'w') as f:
+        #     f.write("npf,1e-20\n")
+        #     f.write("sto,1e-20\n")
+            
+        #     f.write("trgw,0.999\n")
+        #     #f.write("gage,0.3\n")
+
+        # with open(os.path.join(t_d,"phi_direct.csv"),'w') as f:
+        #     f.write("npf,0.7\n")
+        #     f.write("sto,0.3\n")
+            
+        #     f.write("trgw,1e-20\n")
+        #     #f.write("gage,1e-20\n")
+
         
         with open(os.path.join(t_d,"phi_state.csv"),'w') as f:
-            f.write("npf,1e-20\n")
-            f.write("sto,1e-20\n")
-            
-            f.write("trgw,0.999\n")
+            f.write("prop,1e-20\n")
+            f.write("trgw,1.0\n")
             #f.write("gage,0.3\n")
 
         with open(os.path.join(t_d,"phi_direct.csv"),'w') as f:
-            f.write("npf,0.7\n")
-            f.write("sto,0.3\n")
-            
+            f.write("prop,1.0\n")
             f.write("trgw,1e-20\n")
             #f.write("gage,1e-20\n")
+
+
 
             
         #pst.pestpp_options["ies_phi_factor_file"] = "phi_joint.csv"
@@ -1357,34 +1369,39 @@ if __name__ == "__main__":
 
 
     # prep stuff
-    daily_to_monthly()  
+    # daily_to_monthly()  
     setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,include_constants=False,binary_pe=True)
+    # #exit()
     run_a_real(t_d)
     run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
     set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
+    # #exit()
     build_localizer(t_d)
-    exit()
+   
    
     # run cases - dont use phi factor file
-    #run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)#,ies_phi_factor_file="phi_direct.csv")    
-    #run(t_d,m_d=state_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)#,ies_phi_factor_file="phi_state.csv")
-    #run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)#,ies_phi_factor_file="phi_joint.csv",ies_multimodal_alpha=0.99,ies_n_iter_mean=-1)
-    #seq_t_d = prep_sequential(t_d,direct_m_d)   
-    #run(seq_t_d,m_d=seq_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)#,ies_phi_factor_file="phi_seq.csv")
+    run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_direct.csv")    
+    run(t_d,m_d=state_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_state.csv")
+    # no phi factor file here - just rely on the weights
+    run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
+    seq_t_d = prep_sequential(t_d,direct_m_d)  
+    # no phi factor file here - just rely on the weights 
+    run(seq_t_d,m_d=seq_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
+    
     #jointmniter_m_d = "master_mniter_joint"
     #run(t_d,m_d=jointmniter_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,
-    #    ies_multimodal_alpha=0.99,ies_n_iter_mean=2)
+    #   ies_multimodal_alpha=0.99,ies_n_iter_mean=2)
     #exit()
-    joint_m_d = "master_joint"
     #plotting
+    
     plot_forecast_combined([seq_m_d,direct_m_d,state_m_d,joint_m_d])
-    exit()
+    #exit()
     for m_d in [seq_m_d,direct_m_d,state_m_d,joint_m_d]:
-        make_kickass_figs(m_d,post_noptmax=noptmax)
-        processing.plot_results_pub(m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
-        processing.plot_histo_pub(m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
-        processing.plot_histo(m_d, pstf="freyberg", log_oe=False, noptmax=noptmax)
-        processing.plot_par_changes(m_d,noptmax=noptmax)
+        make_kickass_figs(m_d)
+        processing.plot_results_pub(m_d, pstf="freyberg", log_oe=False)
+        processing.plot_histo_pub(m_d, pstf="freyberg", log_oe=False)
+        processing.plot_histo(m_d, pstf="freyberg", log_oe=False)
+        processing.plot_par_changes(m_d)
 
     # make_kickass_figs(nophi_m_d,post_noptmax=noptmax)
     # processing.plot_results_pub(nophi_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
