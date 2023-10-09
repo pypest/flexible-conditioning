@@ -169,7 +169,7 @@ def setup_interface(org_ws,t_d=None,num_reals=100,full_interface=True,include_co
     # define a dict that contains file name tags and lower/upper bound information
     #tags = {"npf_k_":[0.1,10.],"npf_k33_":[.1,10],"sto_ss":[.1,10],"sto_sy":[.9,1.1]}#,
             #"rch_recharge":[.5,1.5]}
-    tags = {"npf_k_": [0.1, 10.], "sto_ss": [.1, 10]}
+    tags = {"npf_k_": [0.05, 20.], "sto_ss": [.05, 20]}
     dts = pd.to_datetime("1-1-2018") + \
           pd.to_timedelta(np.cumsum(sim.tdis.perioddata.array["perlen"]),unit="d")
 
@@ -201,7 +201,7 @@ def setup_interface(org_ws,t_d=None,num_reals=100,full_interface=True,include_co
                     int(arr_file.strip(".txt").split('layer')[-1]) > 1):
                 continue
             pf.add_parameters(filenames=arr_file,par_type="grid",par_name_base=arr_file.split('.')[1].replace("_","")+"_gr",
-                              pargp=arr_file.split('.')[1].replace("_","")+"_gr",zone_array=ib,upper_bound=1.5,lower_bound=0.5,
+                              pargp=arr_file.split('.')[1].replace("_","")+"_gr",zone_array=ib,upper_bound=2,lower_bound=0.5,
                               geostruct=grid_gs)
             #pf.add_parameters(filenames=arr_file, par_type="pilotpoints", par_name_base=arr_file.split('.')[1].replace("_","")+"_pp",
             #                  pargp=arr_file.split('.')[1].replace("_","")+"_pp", zone_array=ib,upper_bound=ub,lower_bound=lb,
@@ -404,6 +404,7 @@ def apply_pps():
         interp = results["result"]
         interp = interp.reshape(org_arr.shape)
         new_arr = org_arr * interp
+        new_arr = new_arr
         new_arr[new_arr<1.0e-10] = 1.0e-10
         np.savetxt(model_file,new_arr,fmt="%15.6E")
         np.savetxt("interp_"+model_file,interp,fmt="%15.6E")
@@ -653,9 +654,9 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
         assert kobs.shape[0] == len(keep_usecols) * 12
         obs.loc[kobs.obsnme,"obsval"] = obs.loc[kobs.obsnme,"truth_val"].values
         # gw level obs: sigma = 0.5, so weight = 2
-        obs.loc[kobs.obsnme,"weight"] = 0.5
+        obs.loc[kobs.obsnme,"weight"] = 2.0
         obs.loc[kobs.obsnme,"observed"] = True
-        obs.loc[kobs.loc[kobs.usecol.str.startswith("trgw"),"obsnme"],"standard_deviation"] = 2.0
+        obs.loc[kobs.loc[kobs.usecol.str.startswith("trgw"),"obsnme"],"standard_deviation"] = 0.5
         obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"standard_deviation"] = kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05
         obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"weight"] = 0.0 #1.0 /(kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05)
         
@@ -721,17 +722,17 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
     # means weight = 1 / (2/4) = 2.0
     pst.observation_data.loc[hk_nznames, "lower_bound"] = vals - 1
     pst.observation_data.loc[hk_nznames, "upper_bound"] = vals + 1
-    pst.observation_data.loc[hk_nznames, "weight"] = 4 # + np.cumsum(np.ones(len(hk_nznames))+1)
+    pst.observation_data.loc[hk_nznames, "weight"] = 2 # + np.cumsum(np.ones(len(hk_nznames))+1)
 
     #vals = pst.observation_data.loc[hk_iq_nznames,"obsval"] - 0.5
     # less than hk ineq.  Enforce that values need to be less than truth value + 0.25 log cycle
     # this implies that truth + 0.25 = upper 95% confidence (mean plus 2 sigma). 
     # So weight = 1 / (0.25 / 2) = 8.0
-    vals = np.array([truth[n]+0.1 for n in hk_iq_nznames])
+    vals = np.array([truth[n]+0.25 for n in hk_iq_nznames])
     pst.observation_data.loc[hk_iq_nznames, "obsval"] = vals
     #pst.observation_data.loc[hk_iq_nzname, "lower_bound"] = val - 1
     #pst.observation_data.loc[hk_iq_nzname, "upper_bound"] = val + 1
-    pst.observation_data.loc[hk_iq_nznames, "weight"] = 10.0
+    pst.observation_data.loc[hk_iq_nznames, "weight"] = 8.0
     pst.observation_data.loc[hk_iq_nznames, "obgnme"] = obs.loc[hk_iq_nznames,"oname"].apply(lambda x: "less_than_"+x)
     
     #vals = np.random.normal(1.5, 0.1, len(w_nznames))
@@ -739,11 +740,11 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
     # greater than hk ineq.  Enforce that values need to be greater than truth value - 0.25 log cycle
     # this implies that truth - 0.25 = lower 95% confidence (mean minus 2 sigma). 
     # So weight = 1 / (0.25 / 2) = 8.0
-    vals = np.array([truth[n] - 0.1 for n in w_nznames])
+    vals = np.array([truth[n] - 0.25 for n in w_nznames])
     pst.observation_data.loc[w_nznames, "obsval"] = vals
     pst.observation_data.loc[w_nznames, "lower_bound"] = vals - 1
     pst.observation_data.loc[w_nznames, "upper_bound"] = vals + 1
-    pst.observation_data.loc[w_nznames, "weight"] = 10.0
+    pst.observation_data.loc[w_nznames, "weight"] = 8.0
     pst.observation_data.loc[w_nznames, "obgnme"] = obs.loc[w_nznames,"oname"].apply(lambda x: "greater_than_well_"+x)
 
     pst.observation_data.loc[:,"observed_value"] = pst.observation_data.obsval.values
@@ -1229,7 +1230,8 @@ def run_a_real(t_d,real_name=None,pe_fname=None):
     levs = ax.contour(harr,levels=6,colors='k')
     ax.clabel(levs,levs.levels)
     ax.set_title("hk array")
-    plt.show()
+    plt.savefig("hk_array.pdf")
+    plt.close(fig)
 
 
 def daily_to_monthly(daily_d="freyberg_daily",monthly_d="freyberg_monthly"):
@@ -1357,7 +1359,7 @@ if __name__ == "__main__":
 
     noptmax = 6
     num_reals = 100
-    num_workers = 12
+    num_workers = 10
 
     t_d = "monthly_template"
     truth_m_d = "monthly_truth_prior_master"
@@ -1373,6 +1375,7 @@ if __name__ == "__main__":
     setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,include_constants=False,binary_pe=True)
     # #exit()
     run_a_real(t_d)
+    #exit()
     run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
     set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
     # #exit()
@@ -1380,7 +1383,8 @@ if __name__ == "__main__":
    
    
     # run cases - dont use phi factor file
-    run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_direct.csv")    
+    run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_direct.csv",ies_save_lambda_ensembles=True,save_binary=False)    
+    exit()
     run(t_d,m_d=state_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_state.csv")
     # no phi factor file here - just rely on the weights
     run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
