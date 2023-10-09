@@ -720,9 +720,9 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
 
     # for hk equality type - distance between bounds in log space = 2, assuming 4 stdevs between bounds
     # means weight = 1 / (2/4) = 2.0
-    pst.observation_data.loc[hk_nznames, "lower_bound"] = vals - 1
-    pst.observation_data.loc[hk_nznames, "upper_bound"] = vals + 1
-    pst.observation_data.loc[hk_nznames, "weight"] = 2 # + np.cumsum(np.ones(len(hk_nznames))+1)
+    pst.observation_data.loc[hk_nznames, "lower_bound"] = vals - 0.1
+    pst.observation_data.loc[hk_nznames, "upper_bound"] = vals + .1
+    pst.observation_data.loc[hk_nznames, "weight"] = 20 # + np.cumsum(np.ones(len(hk_nznames))+1)
 
     #vals = pst.observation_data.loc[hk_iq_nznames,"obsval"] - 0.5
     # less than hk ineq.  Enforce that values need to be less than truth value + 0.25 log cycle
@@ -755,16 +755,16 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
         dup_ss_nznames = [n.replace("sto","dup-sto") for n in ss_nznames]
         #vals = np.random.normal(0, 1.0, len(ss_nznames))
         #vals = pst.observation_data.loc[ss_nznames, "obsval"].values + vals
-        # ss double ineq.  We want values to be in range of truth +/- 0.25 log cycles.  
-        # this implies 0.5 log cycles covers the 95% CL range (mean +/ 2 sigma). 
-        # so weight = 1 / (0.5/4) = 
+        # ss double ineq.  We want values to be in range of truth +/- 0.5 log cycles.  
+        # this implies 1 log cycles covers the 95% CL range (mean +/ 2 sigma). 
+        # so weight = 1 / (1/4) = 4
         vals = np.array([truth[n] for n in ss_nznames])
-        pst.observation_data.loc[ss_nznames, "obsval"] = vals - 0.25
-        pst.observation_data.loc[dup_ss_nznames, "obsval"] = vals + 0.25
+        pst.observation_data.loc[ss_nznames, "obsval"] = vals - 0.5
+        pst.observation_data.loc[dup_ss_nznames, "obsval"] = vals + 0.5
         pst.observation_data.loc[ss_nznames, "obgnme"] = obs.loc[ss_nznames,"oname"].apply(lambda x: "greater_than_"+x)
         pst.observation_data.loc[dup_ss_nznames, "obgnme"] = obs.loc[dup_ss_nznames,"oname"].apply(lambda x: "less_than_"+x)
-        pst.observation_data.loc[ss_nznames, "weight"] = 8.0
-        pst.observation_data.loc[dup_ss_nznames, "weight"] = 8.0
+        pst.observation_data.loc[ss_nznames, "weight"] = 4.0
+        pst.observation_data.loc[dup_ss_nznames, "weight"] = 4.0
         pst.observation_data.loc[ss_nznames,"observed_value"] = vals
         pst.observation_data.loc[dup_ss_nznames, "observed_value"] = vals
 
@@ -1359,7 +1359,7 @@ if __name__ == "__main__":
 
     noptmax = 2
     num_reals = 100
-    num_workers = 10
+    num_workers = 8
 
     t_d = "monthly_template"
     truth_m_d = "monthly_truth_prior_master"
@@ -1367,7 +1367,9 @@ if __name__ == "__main__":
     direct_m_d = "master_direct"
     state_m_d = "master_state"
     joint_m_d = "master_joint"
+    staged_m_d = "master_staged"
     seq_m_d = "master_seq"
+
 
     # prep stuff
     # daily_to_monthly()  
@@ -1377,30 +1379,35 @@ if __name__ == "__main__":
     
     #run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
     
-    #set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
+    set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
     
-    #build_localizer(t_d)
+    build_localizer(t_d)
     
     # run cases
-    #run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_direct.csv")    
+    run(t_d,m_d=direct_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_direct.csv")    
     
-    #run(t_d,m_d=state_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_state.csv")
+    run(t_d,m_d=state_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_state.csv")
     
     # no phi factor file here - just rely on the weights
-    #run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
+    run(t_d,m_d=joint_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
     
-    #seq_t_d = prep_sequential(t_d,direct_m_d)  
+    staged_t_d = prep_sequential(t_d,direct_m_d)  
     
     # no phi factor file here - just rely on the weights 
-    #run(seq_t_d,m_d=seq_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
+    run(staged_t_d,m_d=staged_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax)
     
+    # use the states phi factor file to disable the direct obs
+    # for a true sequential da process
+    run(staged_t_d,m_d=seq_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,ies_phi_factor_file="phi_state.csv")
+    
+
     #jointmniter_m_d = "master_mniter_joint"
     #run(t_d,m_d=jointmniter_m_d,num_workers=num_workers,num_reals=num_reals,noptmax=noptmax,
     #   ies_multimodal_alpha=0.99,ies_n_iter_mean=2)
     #exit()
     
     #plotting
-    m_ds = [direct_m_d,state_m_d,joint_m_d,seq_m_d]
+    m_ds = [direct_m_d,state_m_d,joint_m_d,staged_m_d,seq_m_d]
     #m_ds = [direct_m_d,state_m_d]
     #plot_forecast_combined(m_ds)
     for m_d in m_ds:
