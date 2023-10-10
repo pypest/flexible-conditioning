@@ -22,6 +22,7 @@ unit_dict = {"head":"sw-gw flux $\\frac{ft^3}{d}$",
 label_dict = {"head": "headwater",
              "tail": "tailwater",
              "trgw_2_29_5": "gw_1",
+
               "trgw_2_101_23": "gw_2",
              "gage": "sw_1"}
 
@@ -261,7 +262,7 @@ def setup_interface(org_ws,t_d=None,num_reals=100,full_interface=True,include_co
                     os.path.join(pf.new_d, mf_exe))
 
         pf.add_parameters("freyberg6.sfr_packagedata.txt",par_type="grid",index_cols=[0,1,2,3],
-            use_cols=[9],par_name_base="sfrk",pargp="sfrk",upper_bound=3,lower_bound=.3,mfile_sep=" ",mfile_skip=0)
+            use_cols=[9],par_name_base="sfrk",pargp="sfrk",upper_bound=3,lower_bound=.3)#,mfile_sep=" ",mfile_skip=0)
 
 
         wfiles = [f for f in os.listdir(pf.new_d) if "wel_stress_period_data" in f and f.endswith(".txt")]
@@ -273,7 +274,7 @@ def setup_interface(org_ws,t_d=None,num_reals=100,full_interface=True,include_co
                 continue
             print(wfile)
             valid_wfiles.append(wfile)
-            pf.add_parameters(wfile,par_type="grid",index_cols=[0,1,2],use_cols=[3],mfile_sep=" ",mfile_skip=0,
+            pf.add_parameters(wfile,par_type="grid",index_cols=[0,1,2],use_cols=[3],
             upper_bound=1.5,lower_bound=0.5,par_name_base="wel_kper:{0}".format(kper),pargp="wel_kper:{0}".format(kper))
         assert len(valid_wfiles) == sim.tdis.nper.data,len(valid_wfiles)  
         #pf.add_parameters(wfiles,par_type="grid",index_cols=[0,1,2],use_cols=[3],mfile_sep=" ",mfile_skip=0,
@@ -293,8 +294,7 @@ def setup_interface(org_ws,t_d=None,num_reals=100,full_interface=True,include_co
             geostruct=rch_gs)
 
         pf.add_parameters("freyberg6.ghb_stress_period_data_1.txt",par_type="constant",par_style="a",index_cols=[0,1,2],
-            use_cols=[3],par_name_base="ghbstage",pargp="ghbstage",upper_bound=0.5,lower_bound=-0.5,transform="none",
-            mfile_sep=" ",mfile_skip=0)
+            use_cols=[3],par_name_base="ghbstage",pargp="ghbstage",upper_bound=0.5,lower_bound=-0.5,transform="none")
 
     else:
         pf.mod_py_cmds.append("print('model')")
@@ -1370,13 +1370,16 @@ if __name__ == "__main__":
     staged_m_d = "master_staged"
     seq_m_d = "master_seq"
 
-
+    ppu_dir = os.path.join("..","..","pypestutils")
+    assert os.path.exists(ppu_dir)
     # prep stuff
     # daily_to_monthly()  
-    #setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,include_constants=False,binary_pe=True)
+
+    setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,
+        include_constants=False,binary_pe=True,ppu_dir=ppu_dir)
     
-    #run_a_real(t_d)
-    
+    run_a_real(t_d)
+    exit()
     #run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
     
     set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
