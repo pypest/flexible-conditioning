@@ -1357,9 +1357,9 @@ if __name__ == "__main__":
     #ensemble_stacking_experiment()
     #exit()
 
-    noptmax = 2
-    num_reals = 100
-    num_workers = 8
+    noptmax = 4
+    num_reals = 250
+    num_workers = 20
 
     t_d = "monthly_template"
     truth_m_d = "monthly_truth_prior_master"
@@ -1367,7 +1367,7 @@ if __name__ == "__main__":
     direct_m_d = "master_direct"
     state_m_d = "master_state"
     joint_m_d = "master_joint"
-    staged_m_d = "master_staged"
+    staged_m_d = "master_incremental"
     seq_m_d = "master_seq"
 
     ppu_dir = os.path.join("..","..","pypestutils")
@@ -1379,8 +1379,8 @@ if __name__ == "__main__":
         include_constants=False,binary_pe=True,ppu_dir=ppu_dir)
     
     run_a_real(t_d)
-    exit()
-    #run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d,panther_agent_freeze_on_fail=True)
+
+    run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d)
     
     set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
     
