@@ -654,9 +654,9 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
         assert kobs.shape[0] == len(keep_usecols) * 12
         obs.loc[kobs.obsnme,"obsval"] = obs.loc[kobs.obsnme,"truth_val"].values
         # gw level obs: sigma = 0.5, so weight = 2
-        obs.loc[kobs.obsnme,"weight"] = 1.0
+        obs.loc[kobs.obsnme,"weight"] = 0.5
         obs.loc[kobs.obsnme,"observed"] = True
-        obs.loc[kobs.loc[kobs.usecol.str.startswith("trgw"),"obsnme"],"standard_deviation"] = 1.0
+        obs.loc[kobs.loc[kobs.usecol.str.startswith("trgw"),"obsnme"],"standard_deviation"] = 2.0
         obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"standard_deviation"] = kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05
         obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"weight"] = 0.0 #1.0 /(kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05)
         
@@ -728,11 +728,11 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
     # less than hk ineq.  Enforce that values need to be less than truth value + 0.25 log cycle
     # this implies that truth + 0.25 = upper 95% confidence (mean plus 2 sigma). 
     # So weight = 1 / (0.25 / 2) = 8.0
-    vals = np.array([truth[n]+0.1 for n in hk_iq_nznames])
+    vals = np.array([truth[n]+0.25 for n in hk_iq_nznames])
     pst.observation_data.loc[hk_iq_nznames, "obsval"] = vals
     #pst.observation_data.loc[hk_iq_nzname, "lower_bound"] = val - 1
     #pst.observation_data.loc[hk_iq_nzname, "upper_bound"] = val + 1
-    pst.observation_data.loc[hk_iq_nznames, "weight"] = 20.0
+    pst.observation_data.loc[hk_iq_nznames, "weight"] = 8.0
     pst.observation_data.loc[hk_iq_nznames, "obgnme"] = obs.loc[hk_iq_nznames,"oname"].apply(lambda x: "less_than_"+x)
     
     #vals = np.random.normal(1.5, 0.1, len(w_nznames))
@@ -740,11 +740,11 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
     # greater than hk ineq.  Enforce that values need to be greater than truth value - 0.25 log cycle
     # this implies that truth - 0.25 = lower 95% confidence (mean minus 2 sigma). 
     # So weight = 1 / (0.25 / 2) = 8.0
-    vals = np.array([truth[n] - 0.1 for n in w_nznames])
+    vals = np.array([truth[n] - 0.25 for n in w_nznames])
     pst.observation_data.loc[w_nznames, "obsval"] = vals
     #pst.observation_data.loc[w_nznames, "lower_bound"] = vals - 1
     #pst.observation_data.loc[w_nznames, "upper_bound"] = vals + 1
-    pst.observation_data.loc[w_nznames, "weight"] = 20.0
+    pst.observation_data.loc[w_nznames, "weight"] = 8.0
     pst.observation_data.loc[w_nznames, "obgnme"] = obs.loc[w_nznames,"oname"].apply(lambda x: "greater_than_well_"+x)
 
     pst.observation_data.loc[:,"observed_value"] = pst.observation_data.obsval.values
@@ -759,12 +759,12 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
         # this implies 1 log cycles covers the 95% CL range (mean +/ 2 sigma). 
         # so weight = 1 / (1/4) = 4
         vals = np.array([truth[n] for n in ss_nznames])
-        pst.observation_data.loc[ss_nznames, "obsval"] = vals - 0.25
-        pst.observation_data.loc[dup_ss_nznames, "obsval"] = vals + 0.25
+        pst.observation_data.loc[ss_nznames, "obsval"] = vals - 0.5
+        pst.observation_data.loc[dup_ss_nznames, "obsval"] = vals + 0.5
         pst.observation_data.loc[ss_nznames, "obgnme"] = obs.loc[ss_nznames,"oname"].apply(lambda x: "greater_than_"+x)
         pst.observation_data.loc[dup_ss_nznames, "obgnme"] = obs.loc[dup_ss_nznames,"oname"].apply(lambda x: "less_than_"+x)
-        pst.observation_data.loc[ss_nznames, "weight"] = 8.0
-        pst.observation_data.loc[dup_ss_nznames, "weight"] = 8.0
+        pst.observation_data.loc[ss_nznames, "weight"] = 4.0
+        pst.observation_data.loc[dup_ss_nznames, "weight"] = 4.0
         pst.observation_data.loc[ss_nznames,"observed_value"] = vals
         pst.observation_data.loc[dup_ss_nznames, "observed_value"] = vals
 
@@ -1413,12 +1413,13 @@ if __name__ == "__main__":
     m_ds = [direct_m_d,state_m_d,joint_m_d,staged_m_d,seq_m_d]
     #m_ds = [direct_m_d,state_m_d]
     plot_forecast_combined(m_ds)
-    # for m_d in m_ds:
-    #     make_kickass_figs(m_d)
-    #     processing.plot_results_pub(m_d, pstf="freyberg", log_oe=False)
-    #     processing.plot_histo_pub(m_d, pstf="freyberg", log_oe=False)
-    #     processing.plot_histo(m_d, pstf="freyberg", log_oe=False)
-    #     processing.plot_par_changes(m_d)
+    exit()
+    for m_d in m_ds:
+        make_kickass_figs(m_d)
+        processing.plot_results_pub(m_d, pstf="freyberg", log_oe=False)
+        processing.plot_histo_pub(m_d, pstf="freyberg", log_oe=False)
+        processing.plot_histo(m_d, pstf="freyberg", log_oe=False)
+        processing.plot_par_changes(m_d)
 
     # make_kickass_figs(nophi_m_d,post_noptmax=noptmax)
     # processing.plot_results_pub(nophi_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
