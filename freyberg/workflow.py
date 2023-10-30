@@ -424,8 +424,10 @@ def run(t_d,num_workers=5,num_reals=100,noptmax=-1,m_d=None,init_lam=None,mm_alp
     pst.pestpp_options["ies_subset_size"] = -10
     if mm_alpha is not None:
         pst.pestpp_options["ies_multimodal_alpha"] = 0.15
+    pst.pestpp_options["ies_use_approx"] = False
     for k,v in kwargs.items():
         pst.pestpp_options[k] = v
+
     #pst.pestpp_options["ies_num_threads"] = 6
     pst.write(os.path.join(t_d,"freyberg.pst"),version=2)
     pyemu.os_utils.start_workers(t_d,"pestpp-ies","freyberg.pst",
@@ -728,11 +730,11 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
     # less than hk ineq.  Enforce that values need to be less than truth value + 0.25 log cycle
     # this implies that truth + 0.25 = upper 95% confidence (mean plus 2 sigma). 
     # So weight = 1 / (0.25 / 2) = 8.0
-    vals = np.array([truth[n]+0.25 for n in hk_iq_nznames])
+    vals = np.array([truth[n]+0.1 for n in hk_iq_nznames])
     pst.observation_data.loc[hk_iq_nznames, "obsval"] = vals
     #pst.observation_data.loc[hk_iq_nzname, "lower_bound"] = val - 1
     #pst.observation_data.loc[hk_iq_nzname, "upper_bound"] = val + 1
-    pst.observation_data.loc[hk_iq_nznames, "weight"] = 8.0
+    pst.observation_data.loc[hk_iq_nznames, "weight"] = 20.0
     pst.observation_data.loc[hk_iq_nznames, "obgnme"] = obs.loc[hk_iq_nznames,"oname"].apply(lambda x: "less_than_"+x)
     
     #vals = np.random.normal(1.5, 0.1, len(w_nznames))
@@ -740,11 +742,11 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
     # greater than hk ineq.  Enforce that values need to be greater than truth value - 0.25 log cycle
     # this implies that truth - 0.25 = lower 95% confidence (mean minus 2 sigma). 
     # So weight = 1 / (0.25 / 2) = 8.0
-    vals = np.array([truth[n] - 0.25 for n in w_nznames])
+    vals = np.array([truth[n] - 0.1 for n in w_nznames])
     pst.observation_data.loc[w_nznames, "obsval"] = vals
     #pst.observation_data.loc[w_nznames, "lower_bound"] = vals - 1
     #pst.observation_data.loc[w_nznames, "upper_bound"] = vals + 1
-    pst.observation_data.loc[w_nznames, "weight"] = 8.0
+    pst.observation_data.loc[w_nznames, "weight"] = 20.0
     pst.observation_data.loc[w_nznames, "obgnme"] = obs.loc[w_nznames,"oname"].apply(lambda x: "greater_than_well_"+x)
 
     pst.observation_data.loc[:,"observed_value"] = pst.observation_data.obsval.values
@@ -759,12 +761,12 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
         # this implies 1 log cycles covers the 95% CL range (mean +/ 2 sigma). 
         # so weight = 1 / (1/4) = 4
         vals = np.array([truth[n] for n in ss_nznames])
-        pst.observation_data.loc[ss_nznames, "obsval"] = vals - 0.5
-        pst.observation_data.loc[dup_ss_nznames, "obsval"] = vals + 0.5
+        pst.observation_data.loc[ss_nznames, "obsval"] = vals - 0.25
+        pst.observation_data.loc[dup_ss_nznames, "obsval"] = vals + 0.25
         pst.observation_data.loc[ss_nznames, "obgnme"] = obs.loc[ss_nznames,"oname"].apply(lambda x: "greater_than_"+x)
         pst.observation_data.loc[dup_ss_nznames, "obgnme"] = obs.loc[dup_ss_nznames,"oname"].apply(lambda x: "less_than_"+x)
-        pst.observation_data.loc[ss_nznames, "weight"] = 4.0
-        pst.observation_data.loc[dup_ss_nznames, "weight"] = 4.0
+        pst.observation_data.loc[ss_nznames, "weight"] = 8.0
+        pst.observation_data.loc[dup_ss_nznames, "weight"] = 8.0
         pst.observation_data.loc[ss_nznames,"observed_value"] = vals
         pst.observation_data.loc[dup_ss_nznames, "observed_value"] = vals
 
