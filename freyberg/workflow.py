@@ -170,7 +170,7 @@ def setup_interface(org_ws,t_d=None,num_reals=100,full_interface=True,include_co
     # define a dict that contains file name tags and lower/upper bound information
     #tags = {"npf_k_":[0.1,10.],"npf_k33_":[.1,10],"sto_ss":[.1,10],"sto_sy":[.9,1.1]}#,
             #"rch_recharge":[.5,1.5]}
-    tags = {"npf_k_": [0.05, 20.], "sto_ss": [.05, 20]}
+    tags = {"npf_k_": [0.01, 100.], "sto_ss": [.05, 20]}
     dts = pd.to_datetime("1-1-2018") + \
           pd.to_timedelta(np.cumsum(sim.tdis.perioddata.array["perlen"]),unit="d")
 
@@ -275,7 +275,7 @@ def setup_interface(org_ws,t_d=None,num_reals=100,full_interface=True,include_co
             print(wfile)
             valid_wfiles.append(wfile)
             pf.add_parameters(wfile,par_type="grid",index_cols=[0,1,2],use_cols=[3],
-            upper_bound=1.5,lower_bound=0.5,par_name_base="wel_kper:{0}".format(kper),pargp="wel_kper:{0}".format(kper))
+            upper_bound=2.0,lower_bound=0.5,par_name_base="wel_kper:{0}".format(kper),pargp="wel_kper:{0}".format(kper))
         assert len(valid_wfiles) == sim.tdis.nper.data,len(valid_wfiles)  
         #pf.add_parameters(wfiles,par_type="grid",index_cols=[0,1,2],use_cols=[3],mfile_sep=" ",mfile_skip=0,
         #    upper_bound=1.5,lower_bound=0.5,par_name_base="wel",pargp="wel")
@@ -290,7 +290,7 @@ def setup_interface(org_ws,t_d=None,num_reals=100,full_interface=True,include_co
             print(rfile)
             valid_rfiles.append(rfile)
         assert len(valid_rfiles) == sim.tdis.nper.data,len(valid_rfiles)  
-        pf.add_parameters(rfiles,par_type="grid",upper_bound=1.2,lower_bound=0.8,par_name_base="rch",pargp="rch",
+        pf.add_parameters(rfiles,par_type="grid",upper_bound=2.0,lower_bound=0.5,par_name_base="rch",pargp="rch",
             geostruct=rch_gs)
 
         pf.add_parameters("freyberg6.ghb_stress_period_data_1.txt",par_type="constant",par_style="a",index_cols=[0,1,2],
@@ -636,6 +636,7 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
     obs.loc[:, "lower_bound"] = np.nan
     obs.loc[:, "upper_bound"] = np.nan
     obs.loc[:,"truth_val"] = obs.obsnme.apply(lambda x: truth[x])
+    obs.loc[:,"obsval"] = obs.truth_val.copy()
     pst.observation_data = obs
 
     if include_modflow_obs:
@@ -656,11 +657,11 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
         assert kobs.shape[0] == len(keep_usecols) * 12
         obs.loc[kobs.obsnme,"obsval"] = obs.loc[kobs.obsnme,"truth_val"].values
         # gw level obs: sigma = 0.5, so weight = 2
-        obs.loc[kobs.obsnme,"weight"] = 0.5
+        obs.loc[kobs.obsnme,"weight"] = 3.0
         obs.loc[kobs.obsnme,"observed"] = True
-        obs.loc[kobs.loc[kobs.usecol.str.startswith("trgw"),"obsnme"],"standard_deviation"] = 2.0
-        obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"standard_deviation"] = kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05
-        obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"weight"] = 0.0 #1.0 /(kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05)
+        obs.loc[kobs.loc[kobs.usecol.str.startswith("trgw"),"obsnme"],"standard_deviation"] = 0.33333
+        #obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"standard_deviation"] = kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05
+        #obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"weight"] = 0.0 #1.0 /(kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05)
         
     obs = obs.loc[obs.otype == "arr", :].copy()
     obs.loc[:, "i"] = obs.i.astype(int)
@@ -691,6 +692,13 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
     #pst = pyemu.Pst(os.path.join(t_d,"freyberg.pst"))
     #obs = pd.read_csv(os.path.join(t_d, "freyberg.obs_data_orig.csv"))
 
+    hkobs = obs.loc[obs.apply(
+        lambda x:  x.k != 1 and "npfk" in x.oname and "dup" not in x.oname and "33" not in x.oname, axis=1),:].copy()
+    # use the 
+    hkobs.sort_values(by="truth_val",inplace=True)
+    hk_iq_nznames = hkobs.obsnme.iloc[:4].to_list()
+
+
     hk_nznames = obs.loc[obs.apply(
         lambda x:  x.ij in ijs and x.k != 1 and "npfk" in x.oname and "dup" not in x.oname and "33" not in x.oname, axis=1),
                          "obsnme"]
@@ -707,7 +715,9 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
         print(missing)
         raise Exception("missing dups...")
 
-    hk_iq_nznames = hk_nznames[::4]
+    
+
+    #hk_nznames = [n for n in hk_nznames if n not in hk_iq_nznames]
     hk_nznames = [n for n in hk_nznames if n not in hk_iq_nznames]
 
     #vals = np.random.normal(0,1.0,len(hk_nznames))
@@ -722,19 +732,19 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
 
     # for hk equality type - distance between bounds in log space = 2, assuming 4 stdevs between bounds
     # means weight = 1 / (2/4) = 2.0
-    pst.observation_data.loc[hk_nznames, "lower_bound"] = vals - 0.1
-    pst.observation_data.loc[hk_nznames, "upper_bound"] = vals + .1
-    pst.observation_data.loc[hk_nznames, "weight"] = 20 # + np.cumsum(np.ones(len(hk_nznames))+1)
+    pst.observation_data.loc[hk_nznames, "lower_bound"] = vals - 0.2
+    pst.observation_data.loc[hk_nznames, "upper_bound"] = vals + .2
+    pst.observation_data.loc[hk_nznames, "weight"] = 10 # + np.cumsum(np.ones(len(hk_nznames))+1)
 
     #vals = pst.observation_data.loc[hk_iq_nznames,"obsval"] - 0.5
     # less than hk ineq.  Enforce that values need to be less than truth value + 0.25 log cycle
     # this implies that truth + 0.25 = upper 95% confidence (mean plus 2 sigma). 
     # So weight = 1 / (0.25 / 2) = 8.0
-    vals = np.array([truth[n]+0.1 for n in hk_iq_nznames])
+    vals = np.array([truth[n]+0.2 for n in hk_iq_nznames])
     pst.observation_data.loc[hk_iq_nznames, "obsval"] = vals
     #pst.observation_data.loc[hk_iq_nzname, "lower_bound"] = val - 1
     #pst.observation_data.loc[hk_iq_nzname, "upper_bound"] = val + 1
-    pst.observation_data.loc[hk_iq_nznames, "weight"] = 20.0
+    pst.observation_data.loc[hk_iq_nznames, "weight"] = 10.0
     pst.observation_data.loc[hk_iq_nznames, "obgnme"] = obs.loc[hk_iq_nznames,"oname"].apply(lambda x: "less_than_"+x)
     
     #vals = np.random.normal(1.5, 0.1, len(w_nznames))
@@ -1377,12 +1387,12 @@ if __name__ == "__main__":
     # prep stuff
     # daily_to_monthly()  
 
-    # setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,
-    #     include_constants=False,binary_pe=True,ppu_dir=ppu_dir)
+    setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,
+         include_constants=False,binary_pe=True,ppu_dir=ppu_dir)
     
-    # run_a_real(t_d)
+    run_a_real(t_d)
 
-    # run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d)
+    run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d)
     
     set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
     
