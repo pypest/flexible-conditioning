@@ -661,7 +661,7 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
         obs.loc[kobs.obsnme,"observed"] = True
         obs.loc[kobs.loc[kobs.usecol.str.startswith("trgw"),"obsnme"],"standard_deviation"] = 0.33333
         obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"standard_deviation"] = kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05
-        #obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"weight"] = 0.0 #1.0 /(kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05)
+        obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"weight"] = 0.0 #1.0 /(kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05)
         
     obs = obs.loc[obs.otype == "arr", :].copy()
     obs.loc[:, "i"] = obs.i.astype(int)
@@ -1387,12 +1387,12 @@ if __name__ == "__main__":
     # prep stuff
     # daily_to_monthly()  
 
-    setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,
-         include_constants=False,binary_pe=True,ppu_dir=ppu_dir)
+    #setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,
+    #     include_constants=False,binary_pe=True,ppu_dir=ppu_dir)
     
-    run_a_real(t_d)
+    #run_a_real(t_d)
 
-    run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d)
+    #run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d)
     
     set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
     
@@ -1425,7 +1425,7 @@ if __name__ == "__main__":
     m_ds = [direct_m_d,state_m_d,joint_m_d,staged_m_d,seq_m_d]
     #m_ds = [direct_m_d,state_m_d]
     plot_forecast_combined(m_ds)
-    exit()
+    
     for m_d in m_ds:
         make_kickass_figs(m_d)
         processing.plot_results_pub(m_d, pstf="freyberg", log_oe=False)
