@@ -660,7 +660,7 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
         obs.loc[kobs.obsnme,"weight"] = 3.0
         obs.loc[kobs.obsnme,"observed"] = True
         obs.loc[kobs.loc[kobs.usecol.str.startswith("trgw"),"obsnme"],"standard_deviation"] = 0.33333
-        #obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"standard_deviation"] = kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05
+        obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"standard_deviation"] = kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05
         #obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"weight"] = 0.0 #1.0 /(kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05)
         
     obs = obs.loc[obs.otype == "arr", :].copy()
@@ -1370,8 +1370,8 @@ if __name__ == "__main__":
     #exit()
 
     noptmax = 4
-    num_reals = 250
-    num_workers = 20
+    num_reals = 50
+    num_workers = 25
 
     t_d = "monthly_template"
     truth_m_d = "monthly_truth_prior_master"
