@@ -657,9 +657,9 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
         assert kobs.shape[0] == len(keep_usecols) * 12
         obs.loc[kobs.obsnme,"obsval"] = obs.loc[kobs.obsnme,"truth_val"].values
         # gw level obs: sigma = 0.5, so weight = 2
-        obs.loc[kobs.obsnme,"weight"] = 3.0
+        obs.loc[kobs.obsnme,"weight"] = 2
         obs.loc[kobs.obsnme,"observed"] = True
-        obs.loc[kobs.loc[kobs.usecol.str.startswith("trgw"),"obsnme"],"standard_deviation"] = 0.33333
+        obs.loc[kobs.loc[kobs.usecol.str.startswith("trgw"),"obsnme"],"standard_deviation"] = 0.5
         obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"standard_deviation"] = kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05
         obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"weight"] = 0.0 #1.0 /(kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05)
         
@@ -692,11 +692,11 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
     #pst = pyemu.Pst(os.path.join(t_d,"freyberg.pst"))
     #obs = pd.read_csv(os.path.join(t_d, "freyberg.obs_data_orig.csv"))
 
-    hkobs = obs.loc[obs.apply(
-        lambda x:  x.k != 1 and "npfk" in x.oname and "dup" not in x.oname and "33" not in x.oname, axis=1),:].copy()
+    hkobsk0 = obs.loc[obs.apply(
+        lambda x:  x.k == 0 and "npfk" in x.oname and "dup" not in x.oname and "33" not in x.oname, axis=1),:].copy()
     # use the 
-    hkobs.sort_values(by="truth_val",inplace=True)
-    hk_iq_nznames = hkobs.obsnme.iloc[:4].to_list()
+    hkobsk0.sort_values(by="truth_val",inplace=True)
+    hk_iq_nznames = hkobsk0.obsnme.iloc[:4].to_list()
 
 
     hk_nznames = obs.loc[obs.apply(
@@ -716,7 +716,6 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
         raise Exception("missing dups...")
 
     
-
     #hk_nznames = [n for n in hk_nznames if n not in hk_iq_nznames]
     hk_nznames = [n for n in hk_nznames if n not in hk_iq_nznames]
 
@@ -740,11 +739,13 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
     # less than hk ineq.  Enforce that values need to be less than truth value + 0.25 log cycle
     # this implies that truth + 0.25 = upper 95% confidence (mean plus 2 sigma). 
     # So weight = 1 / (0.25 / 2) = 8.0
-    vals = np.array([truth[n]+0.2 for n in hk_iq_nznames])
+    #vals = np.array([truth[n]+0.2 for n in hk_iq_nznames])
+    lower_std = hkobsk0.truth_val.values.mean() -(2.0 * hkobsk0.truth_val.values.std()) 
+    vals = [lower_std for _ in hk_iq_nznames]
     pst.observation_data.loc[hk_iq_nznames, "obsval"] = vals
     #pst.observation_data.loc[hk_iq_nzname, "lower_bound"] = val - 1
     #pst.observation_data.loc[hk_iq_nzname, "upper_bound"] = val + 1
-    pst.observation_data.loc[hk_iq_nznames, "weight"] = 10.0
+    pst.observation_data.loc[hk_iq_nznames, "weight"] = 1./(2. * hkobsk0.truth_val.values.std())
     pst.observation_data.loc[hk_iq_nznames, "obgnme"] = obs.loc[hk_iq_nznames,"oname"].apply(lambda x: "less_than_"+x)
     
     #vals = np.random.normal(1.5, 0.1, len(w_nznames))
@@ -775,8 +776,8 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
         pst.observation_data.loc[dup_ss_nznames, "obsval"] = vals + 0.25
         pst.observation_data.loc[ss_nznames, "obgnme"] = obs.loc[ss_nznames,"oname"].apply(lambda x: "greater_than_"+x)
         pst.observation_data.loc[dup_ss_nznames, "obgnme"] = obs.loc[dup_ss_nznames,"oname"].apply(lambda x: "less_than_"+x)
-        pst.observation_data.loc[ss_nznames, "weight"] = 8.0
-        pst.observation_data.loc[dup_ss_nznames, "weight"] = 8.0
+        pst.observation_data.loc[ss_nznames, "weight"] = 4.0
+        pst.observation_data.loc[dup_ss_nznames, "weight"] = 4.0
         pst.observation_data.loc[ss_nznames,"observed_value"] = vals
         pst.observation_data.loc[dup_ss_nznames, "observed_value"] = vals
 
@@ -1370,7 +1371,7 @@ if __name__ == "__main__":
     #exit()
 
     noptmax = 4
-    num_reals = 50
+    num_reals = 100
     num_workers = 25
 
     t_d = "monthly_template"
@@ -1387,12 +1388,12 @@ if __name__ == "__main__":
     # prep stuff
     # daily_to_monthly()  
 
-    #setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,
-    #     include_constants=False,binary_pe=True,ppu_dir=ppu_dir)
+    setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,
+         include_constants=False,binary_pe=True,ppu_dir=ppu_dir)
     
-    #run_a_real(t_d)
+    run_a_real(t_d)
 
-    #run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d)
+    run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d)
     
     set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
     
