@@ -261,40 +261,41 @@ def setup_interface(org_ws,t_d=None,num_reals=100,full_interface=True,include_co
         shutil.copy(os.path.join(exe_dir, mf_exe),
                     os.path.join(pf.new_d, mf_exe))
 
-        pf.add_parameters("freyberg6.sfr_packagedata.txt",par_type="grid",index_cols=[0,1,2,3],
-            use_cols=[9],par_name_base="sfrk",pargp="sfrk",upper_bound=3,lower_bound=.3)#,mfile_sep=" ",mfile_skip=0)
+        if include_forcing_pars:
+            pf.add_parameters("freyberg6.sfr_packagedata.txt",par_type="grid",index_cols=[0,1,2,3],
+                use_cols=[9],par_name_base="sfrk",pargp="sfrk",upper_bound=3,lower_bound=.3)#,mfile_sep=" ",mfile_skip=0)
 
 
-        wfiles = [f for f in os.listdir(pf.new_d) if "wel_stress_period_data" in f and f.endswith(".txt")]
-        valid_wfiles = []
-        for wfile in wfiles:
-            kper = int(wfile.split("_")[-1].split('.')[0])
-            if kper > sim.tdis.nper.data:
-                os.remove(os.path.join(pf.new_d,wfile)) #flopy stupidity...
-                continue
-            print(wfile)
-            valid_wfiles.append(wfile)
-            pf.add_parameters(wfile,par_type="grid",index_cols=[0,1,2],use_cols=[3],
-            upper_bound=2.0,lower_bound=0.5,par_name_base="wel_kper:{0}".format(kper),pargp="wel_kper:{0}".format(kper))
-        assert len(valid_wfiles) == sim.tdis.nper.data,len(valid_wfiles)  
-        #pf.add_parameters(wfiles,par_type="grid",index_cols=[0,1,2],use_cols=[3],mfile_sep=" ",mfile_skip=0,
-        #    upper_bound=1.5,lower_bound=0.5,par_name_base="wel",pargp="wel")
+            wfiles = [f for f in os.listdir(pf.new_d) if "wel_stress_period_data" in f and f.endswith(".txt")]
+            valid_wfiles = []
+            for wfile in wfiles:
+                kper = int(wfile.split("_")[-1].split('.')[0])
+                if kper > sim.tdis.nper.data:
+                    os.remove(os.path.join(pf.new_d,wfile)) #flopy stupidity...
+                    continue
+                print(wfile)
+                valid_wfiles.append(wfile)
+                pf.add_parameters(wfile,par_type="grid",index_cols=[0,1,2],use_cols=[3],
+                upper_bound=2.0,lower_bound=0.5,par_name_base="wel_kper:{0}".format(kper),pargp="wel_kper:{0}".format(kper))
+            assert len(valid_wfiles) == sim.tdis.nper.data,len(valid_wfiles)  
+            #pf.add_parameters(wfiles,par_type="grid",index_cols=[0,1,2],use_cols=[3],mfile_sep=" ",mfile_skip=0,
+            #    upper_bound=1.5,lower_bound=0.5,par_name_base="wel",pargp="wel")
 
-        rfiles = [f for f in os.listdir(pf.new_d) if "rcha_recharge_" in f and f.endswith(".txt")]
-        valid_rfiles = []
-        for rfile in rfiles:
-            kper = int(rfile.split("_")[-1].split('.')[0])
-            if kper > sim.tdis.nper.data:
-                os.remove(os.path.join(pf.new_d,rfile)) #flopy stupidity...
-                continue
-            print(rfile)
-            valid_rfiles.append(rfile)
-        assert len(valid_rfiles) == sim.tdis.nper.data,len(valid_rfiles)  
-        pf.add_parameters(rfiles,par_type="grid",upper_bound=2.0,lower_bound=0.5,par_name_base="rch",pargp="rch",
-            geostruct=rch_gs)
+            rfiles = [f for f in os.listdir(pf.new_d) if "rcha_recharge_" in f and f.endswith(".txt")]
+            valid_rfiles = []
+            for rfile in rfiles:
+                kper = int(rfile.split("_")[-1].split('.')[0])
+                if kper > sim.tdis.nper.data:
+                    os.remove(os.path.join(pf.new_d,rfile)) #flopy stupidity...
+                    continue
+                print(rfile)
+                valid_rfiles.append(rfile)
+            assert len(valid_rfiles) == sim.tdis.nper.data,len(valid_rfiles)  
+            pf.add_parameters(rfiles,par_type="grid",upper_bound=2.0,lower_bound=0.5,par_name_base="rch",pargp="rch",
+                geostruct=rch_gs)
 
-        pf.add_parameters("freyberg6.ghb_stress_period_data_1.txt",par_type="constant",par_style="a",index_cols=[0,1,2],
-            use_cols=[3],par_name_base="ghbstage",pargp="ghbstage",upper_bound=0.5,lower_bound=-0.5,transform="none")
+            pf.add_parameters("freyberg6.ghb_stress_period_data_1.txt",par_type="constant",par_style="a",index_cols=[0,1,2],
+                use_cols=[3],par_name_base="ghbstage",pargp="ghbstage",upper_bound=0.5,lower_bound=-0.5,transform="none")
 
     else:
         pf.mod_py_cmds.append("print('model')")
@@ -1372,7 +1373,8 @@ if __name__ == "__main__":
 
     noptmax = 4
     num_reals = 100
-    num_workers = 25
+    num_workers = 15
+    include_forcing_pars = False
 
     t_d = "monthly_template"
     truth_m_d = "monthly_truth_prior_master"
@@ -1383,13 +1385,14 @@ if __name__ == "__main__":
     staged_m_d = "master_incremental"
     seq_m_d = "master_seq"
 
-    ppu_dir = os.path.join("..","..","pypestutils")
+    #ppu_dir = os.path.join("..","..","pypestutils")
+    ppu_dir = os.path.join("..","..","..","pypestutils")
     assert os.path.exists(ppu_dir)
     # prep stuff
     # daily_to_monthly()  
 
     setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,
-         include_constants=False,binary_pe=True,ppu_dir=ppu_dir)
+         include_constants=False,binary_pe=True,ppu_dir=ppu_dir,include_forcing_pars=include_forcing_pars)
     
     run_a_real(t_d)
 
