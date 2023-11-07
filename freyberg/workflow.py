@@ -52,7 +52,8 @@ else:
 
 
 def setup_interface(org_ws,t_d=None,num_reals=100,full_interface=True,include_constants=True,
-    grid_gs=None,pp_gs=None, dir_suffix="template",binary_pe=True, ppu_dir=os.path.join("..","..","..","pypestutils")):
+    grid_gs=None,pp_gs=None, dir_suffix="template",binary_pe=True, 
+    ppu_dir=os.path.join("..","..","..","pypestutils"),include_forcing_pars=True):
 
 
     if os.path.exists(os.path.join(org_ws, mf_exe)):
