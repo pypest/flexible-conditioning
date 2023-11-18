@@ -698,7 +698,7 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
         lambda x:  x.k == 0 and "npfk" in x.oname and "dup" not in x.oname and "33" not in x.oname, axis=1),:].copy()
     # use the 
     hkobsk0.sort_values(by="truth_val",inplace=True)
-    hk_iq_nznames = hkobsk0.obsnme.iloc[:4].to_list()
+    hk_iq_nznames = hkobsk0.obsnme.iloc[10:100:20].to_list()
 
 
     hk_nznames = obs.loc[obs.apply(
@@ -1374,7 +1374,7 @@ if __name__ == "__main__":
 
     noptmax = 4
     num_reals = 100
-    num_workers = 15
+    num_workers = 25
     include_forcing_pars = False
 
     t_d = "monthly_template"
@@ -1386,8 +1386,8 @@ if __name__ == "__main__":
     staged_m_d = "master_incremental"
     seq_m_d = "master_seq"
 
-    #ppu_dir = os.path.join("..","..","pypestutils")
-    ppu_dir = os.path.join("..","..","..","pypestutils")
+    ppu_dir = os.path.join("..","..","pypestutils")
+    #ppu_dir = os.path.join("..","..","..","pypestutils")
     assert os.path.exists(ppu_dir)
     # prep stuff
     # daily_to_monthly()  
