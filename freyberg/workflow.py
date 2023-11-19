@@ -595,6 +595,7 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
 
     tpst = pyemu.Pst(os.path.join(truth_m_d,"freyberg.pst"))
     toe = pyemu.ObservationEnsemble.from_binary(pst=tpst,filename=os.path.join(truth_m_d,"freyberg.0.obs.jcb"))
+    tpe = pyemu.ParameterEnsemble.from_binary(pst=tpst,filename=os.path.join(truth_m_d,"freyberg.0.par.jcb"))
     obs = tpst.observation_data
     hobs = obs.loc[obs.obsnme.str.contains("headwater"),:].copy()
     assert hobs.shape[0] > 0
@@ -620,7 +621,7 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
     index = [i for ii,i in enumerate(pe.index) if i != truth_real]
     pe = pe.loc[index,:]
     pe.to_binary(os.path.join(t_d,"notruth_prior.jcb"))
-    
+
 
     ijs = []
     for line in lines:
@@ -648,15 +649,16 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
         assert "gage" in usecols
         assert "headwater" in usecols
         assert "tailwater" in usecols
-        keep_usecols = ["trgw-0-65-32","trgw-2-65-32",
-        "trgw-0-8-29","trgw-2-8-29","gage"]
+        #keep_usecols = ["trgw-0-65-32","trgw-2-65-32",
+        #"trgw-0-8-29","trgw-2-8-29","gage"]
         obs = pst.observation_data
-        kobs = obs.loc[obs.usecol.apply(lambda x: x in keep_usecols),:].copy()
+        #kobs = obs.loc[obs.usecol.apply(lambda x: x in keep_usecols),:].copy()
+        kobs = obs.loc[obs.oname == "hds",:].copy()
         assert kobs.shape[0] > 0
         kobs["time"] = kobs.time.astype(float)
         kobs = kobs.loc[kobs.loc[:,"time"] < 13,:]
         print(kobs)
-        assert kobs.shape[0] == len(keep_usecols) * 12
+        #assert kobs.shape[0] == len(keep_usecols) * 12
         obs.loc[kobs.obsnme,"obsval"] = obs.loc[kobs.obsnme,"truth_val"].values
         # gw level obs: sigma = 0.5, so weight = 2
         obs.loc[kobs.obsnme,"weight"] = 2
@@ -698,8 +700,7 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
         lambda x:  x.k == 0 and "npfk" in x.oname and "dup" not in x.oname and "33" not in x.oname, axis=1),:].copy()
     # use the 
     hkobsk0.sort_values(by="truth_val",inplace=True)
-    hk_iq_nznames = hkobsk0.obsnme.iloc[10:100:20].to_list()
-
+    hk_iq_nznames = hkobsk0.obsnme.iloc[2:30:4].to_list()
 
     hk_nznames = obs.loc[obs.apply(
         lambda x:  x.ij in ijs and x.k != 1 and "npfk" in x.oname and "dup" not in x.oname and "33" not in x.oname, axis=1),
@@ -872,7 +873,16 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
             pdf.savefig()
             plt.close(fig)
 
-   
+
+    #pst.observation_data.loc[:,"obsval"] = toe.loc[toe.index[truth_idx],pst.obs_names].values
+    pst.parameter_data.loc[:,"parval1"] = tpe.loc[tpe.index[truth_idx],pst.par_names].values
+    #pst.observation_data.loc[:,"weight"] = 1.0
+    pst.control_data.noptmax = 0
+    pst.write(os.path.join(t_d,"truth.pst"),version=2)
+    pyemu.os_utils.run("pestpp-ies truth.pst",cwd=t_d)
+    pst = pyemu.Pst(os.path.join(t_d,'truth.pst'))
+    print("truth phi",pst.phi)
+    assert pst.phi < 0.1
 
 
 def plot_fields(m_d):
@@ -1004,11 +1014,12 @@ def transfer_pars(cond_pst_file,cond_pe_file,flow_t_d,joint_pe_file):
 
 def plot_mult(t_d,plt_name="mult.pdf"):
 
+    
     df = pd.read_csv(os.path.join(t_d, "mult2model_info.csv"))
     df = df.loc[df.model_file.str.contains("npf_k_layer1"), :]
     #print(df)
     #return
-    pst = pyemu.Pst(os.path.join(t_d,"freyberg.pst"))
+    pst = pyemu.Pst(os.path.join(t_d,"truth.pst"))
     pe = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(t_d,"prior.jcb")).loc[:,pst.par_names]
     pst.parameter_data.loc[:,"parval1"] = pe.iloc[1,:].values
     par = pst.parameter_data
@@ -1063,35 +1074,38 @@ def plot_mult(t_d,plt_name="mult.pdf"):
 
 
 
-def plot_domain(c_t_d="daily_template_cond",t_d="daily_template"):
+def plot_domain(t_d):
+    #pyemu.os_utils.run("pestpp-ies truth.pst",cwd=t_d)
     ib = np.loadtxt(os.path.join(t_d, "freyberg6.dis_idomain_layer1.txt")).reshape((120,60))
     ib[ib>0] = np.nan
-    pst_c = pyemu.Pst(os.path.join(c_t_d,"freyberg.pst"))
-    pst = pyemu.Pst(os.path.join(t_d,"freyberg.pst"))
-    obs_c = pst_c.observation_data.loc[pst_c.nnz_obs_names,:].copy()
-    #print(obs_c.obgnme.unique())
-    obs_c.loc[:,'k'] = obs_c.oname.apply(lambda x: int(x[-1])-1)
-    obs_c .loc[:,"ij"] = obs_c.apply(lambda x: (int(x.i),int(x.j)),axis=1)
-    c_grp = obs_c.groupby("k").ij.unique().to_dict()
-    g_grp = obs_c.groupby("ij").obgnme.unique().to_dict()
-    #print(g_grp)
+    pst = pyemu.Pst(os.path.join(t_d,"truth.pst"))
+    obs = pst.observation_data.copy()
+    nzobs = pst.observation_data.loc[pst.nnz_obs_names,:].copy()
+    pnzobs = nzobs.loc[nzobs.oname.str.contains("prop"),:].copy()
+    hnzobs = nzobs.loc[nzobs.oname.str.contains("hds"),:].copy()
+    assert pnzobs.shape[0] > 0
+    assert hnzobs.shape[0] > 0
 
-    obs = pst.observation_data
-    obs = obs.loc[obs.usecol=="trgw",:]
-    obs.loc[:,"k"] = obs.obsnme.apply(lambda x: int(x.split("_")[3]))
-    obs.loc[:, "i"] = obs.obsnme.apply(lambda x: int(x.split("_")[4]))
-    obs.loc[:, "j"] = obs.obsnme.apply(lambda x: int(x.split("_")[5]))
-    obs.loc[:,"ij"] = obs.apply(lambda x: [x.i,x.j],axis=1)
-    #print(obs.obgnme.unique())
+    #print(obs_c.obgnme.unique())
+    pnzobs.loc[:,'k'] = pnzobs.oname.apply(lambda x: int(x.split("layer")[1][0])-1)
+    pnzobs.loc[:,"ij"] = pnzobs.apply(lambda x: (int(x.i),int(x.j)),axis=1)
+
+    hnzobs.loc[:,"k"] = hnzobs.usecol.apply(lambda x: int(x.split("-")[1]))
+    hnzobs.loc[:,"ij"] = hnzobs.usecol.apply(lambda x: (int(x.split("-")[2]),int(x.split("-")[3])))
+
 
     sfr_arr = np.zeros_like(ib,dtype=float)
     sfr_arr[:60, 47] = 1
     sfr_arr[60:, 47] = 2
 
-    fig,axes = plt.subplots(1,5,figsize=(8,3))
-    for i,ax in enumerate(axes[:-1]):
+    uprop_groups = [g for g in pnzobs.oname.unique() if "dup" not in g]
+    uprop_groups.sort()
+    print(uprop_groups)
+    
+    fig,axes = plt.subplots(3,2,figsize=(6,8))
+    axes = axes.flatten()
+    for i,ax in enumerate(axes[:-2]):
 
-        ax.imshow(ib,cmap="Greys_r",alpha=0.5)
 
         ax.scatter(np.nan, np.nan, c='0.35', marker='s', label='inactive domain')
 
@@ -1108,11 +1122,12 @@ def plot_domain(c_t_d="daily_template_cond",t_d="daily_template"):
 
         #ax.imshow(sfr_arr, cmap="winter")
 
-    tags = ["npfklayer1","npfklayer3","stosslayer1","stosslayer3"]
+    #tags = ["npfklayer1","npfklayer3","stosslayer1","stosslayer3"]
     names = ["A) Layer 1 HK","B) Layer 3 HK","C) Layer 1 SS","D) Layer 3 SS"]
-    for tag,ax,name in zip(tags,axes,names):
-        k = int(tag[-1]) - 1
-        tobs = obs_c.loc[obs_c.obgnme.str.contains(tag),:].copy()
+    cb_labels = ["$\\frac{m}{d}$","$\\frac{m}{d}","$\\frac{1}{m}","$\\frac{1}{m}"]
+    for tag,ax,name,lab in zip(uprop_groups,axes,names,cb_labels):
+        #k = int(tag[-1]) - 1
+        tobs = pnzobs.loc[pnzobs.oname.str.contains(tag),:].copy()
         ijs = tobs.loc[tobs.obgnme.apply(lambda x: "less" not in x and "greater" not in x),:]
         print(tag,ijs.obgnme)
         ax.scatter([ij[1] for ij in ijs.ij],[ij[0] for ij in ijs.ij],marker = ".",color='r',label="equality")
@@ -1121,12 +1136,28 @@ def plot_domain(c_t_d="daily_template_cond",t_d="daily_template"):
         ijs = tobs.loc[tobs.obgnme.str.contains("greater"), :]
         ax.scatter([ij[1] for ij in ijs.ij], [ij[0] for ij in ijs.ij], marker="_", color='r',
                    label="greater-than inequality")
+        k = tobs.k.iloc[0]
+        hobs = hnzobs.loc[hnzobs.k==k,:].copy()
+        ijs = hobs.ij.unique()
+        print(k,ijs)
+        ax.scatter([ij[1] for ij in ijs],[ij[0] for ij in ijs],marker = "o",color='m',facecolor="none",label="gw level monitoring",s=50,lw=3)
         ax.set_title(name,loc="left")
-    axes[-1].set_axis_off()
 
+        pobs = obs.loc[obs.oname==tag,:]
+        pobs["i"] = pobs.i.astype(int)
+        pobs["j"] = pobs.j.astype(int)
+        arr = np.zeros_like(ib,dtype="float")
+        arr[pobs.i.values,pobs.j.values] = pobs.obsval.values
+        cb = ax.imshow(arr,alpha=0.95)
+        plt.colorbar(cb,ax=ax,label=lab)
+        ax.imshow(ib,cmap="Greys_r",alpha=1.0)
+
+
+    axes[-1].set_axis_off()
+    axes[-2].set_axis_off()
 
     plt.tight_layout()
-    ax.legend(bbox_to_anchor=(1.1,1))
+    ax.legend(bbox_to_anchor=(-0.25,-0.5))
     plt.savefig("domain.pdf")
     return
 
@@ -1367,13 +1398,16 @@ def plot_forecast_combined(m_ds):
     plt.savefig("combined_forecast.pdf")
 
 
+    
+
+
 if __name__ == "__main__":
 
     #ensemble_stacking_experiment()
     #exit()
-
+    
     noptmax = 4
-    num_reals = 100
+    num_reals = 200
     num_workers = 25
     include_forcing_pars = False
 
@@ -1387,10 +1421,11 @@ if __name__ == "__main__":
     seq_m_d = "master_seq"
 
     ppu_dir = os.path.join("..","..","pypestutils")
-    #ppu_dir = os.path.join("..","..","..","pypestutils")
+    if not os.path.exists(ppu_dir):
+        ppu_dir = os.path.join("..","..","..","pypestutils")
     assert os.path.exists(ppu_dir)
     # prep stuff
-    # daily_to_monthly()  
+    daily_to_monthly()  
 
     setup_interface("freyberg_monthly",t_d=t_d,num_reals=num_reals,full_interface=True,
          include_constants=False,binary_pe=True,ppu_dir=ppu_dir,include_forcing_pars=include_forcing_pars)
@@ -1400,6 +1435,7 @@ if __name__ == "__main__":
     run(t_d,num_workers=num_workers,num_reals=num_reals,noptmax=-1,m_d=truth_m_d)
     
     set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
+    plot_domain(t_d)
     
     build_localizer(t_d)
     
@@ -1487,7 +1523,7 @@ if __name__ == "__main__":
     
     # now make all the figures for the manuscript
     
-    #plot_mult(cond_t_d)
+    
     #plot_domain()
     # make_kickass_figs(joint_t_d,post_noptmax=8)
     # processing.plot_results_pub(cond_m_d, pstf="freyberg", log_oe=False,noptmax=noptmax)
