@@ -680,14 +680,14 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
     wdf.loc[:, "kij"] = wdf.apply(lambda x: (int(x.l) - 1, int(x.r) - 1, int(x.c) - 1), axis=1)
     wkij = set(wdf.kij.tolist())
     w_nznames = obs.loc[obs.apply(lambda x: x.kij in wkij and "npfk" in x.oname and "33" not in x.oname, axis=1), "obsnme"]
-    for kij in wkij:
-        exclude_i = np.arange(kij[1]-10,kij[1]+10,dtype=int)
-        exclude_j = np.arange(kij[2] - 10, kij[2] + 10, dtype=int)
-        exclude = []
-        for i in exclude_i:
-            exclude.extend([(i,j) for j in exclude_j])
-        exclude = set(exclude)
-        ijs = [ij for ij in ijs if ij not in exclude]
+    # for kij in wkij:
+    #     exclude_i = np.arange(kij[1]-10,kij[1]+10,dtype=int)
+    #     exclude_j = np.arange(kij[2] - 10, kij[2] + 10, dtype=int)
+    #     exclude = []
+    #     for i in exclude_i:
+    #         exclude.extend([(i,j) for j in exclude_j])
+    #     exclude = set(exclude)
+    #     ijs = [ij for ij in ijs if ij not in exclude]
     #np.random.seed(222)
     np.random.seed(555)
     #idxs = np.random.randint(0,len(ijs),4)
