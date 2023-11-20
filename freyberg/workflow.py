@@ -662,9 +662,9 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
         #assert kobs.shape[0] == len(keep_usecols) * 12
         obs.loc[kobs.obsnme,"obsval"] = obs.loc[kobs.obsnme,"truth_val"].values
         # gw level obs: sigma = 0.5, so weight = 2
-        obs.loc[kobs.obsnme,"weight"] = 2
+        obs.loc[kobs.obsnme,"weight"] = 5
         obs.loc[kobs.obsnme,"observed"] = True
-        obs.loc[kobs.loc[kobs.usecol.str.startswith("trgw"),"obsnme"],"standard_deviation"] = 0.5
+        obs.loc[kobs.loc[kobs.usecol.str.startswith("trgw"),"obsnme"],"standard_deviation"] = 0.2
         obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"standard_deviation"] = kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05
         obs.loc[kobs.loc[kobs.usecol == "gage","obsnme"],"weight"] = 0.0 #1.0 /(kobs.loc[kobs.usecol == "gage","truth_val"] * 0.05)
         
@@ -1402,6 +1402,43 @@ def plot_forecast_combined(m_ds):
 
 
     
+def plot_head_timeseries(m_d,post_noptmax=None):
+    
+    pst = pyemu.Pst(os.path.join(m_d,"freyberg.pst"))
+    obs = pst.observation_data
+    hnzobs = obs.loc[obs.obsnme.str.contains("trgw") & obs.weight > 0,:]
+    assert hnzobs.shape[0] > 0
+
+    if post_noptmax is None:
+        phidf = pd.read_csv(os.path.join(m_d,"freyberg.phi.actual.csv"))
+        post_noptmax = int(phidf.iteration.values.max())
+    oe_pr = pyemu.ObservationEnsemble.from_binary(pst=pst,filename=os.path.join(m_d,"freyberg.0.obs.jcb"))
+    noise = pyemu.ObservationEnsemble.from_binary(pst=pst,filename=os.path.join(m_d,"freyberg.obs+noise.jcb"))
+    oe_pt= pyemu.ObservationEnsemble.from_binary(pst=pst,filename=os.path.join(m_d,"freyberg.{0}.obs.jcb".format(post_noptmax)))
+
+    ugroups = hnzobs.obgnme.unique()
+    ugroups.sort()
+
+    with PdfPages(os.path.join(m_d,"headtimeseries_{0}.pdf".format(post_noptmax))) as pdf:
+        for ugroup in ugroups:
+            uobs = hnzobs.loc[hnzobs.obgnme==ugroup,:].copy()
+            uobs.sort_values(by="time",inplace=True)
+            fig,ax = plt.subplots(1,1,figsize=(8,4))
+            times = uobs.time.values
+            names = uobs.obsnme.values
+            ax.scatter(times,uobs.obsval.values,marker="^",color='r',s=30)
+            vals = noise.loc[:,names].values
+            [ax.plot(times,v,"r-",lw=0.1,alpha=0.2) for v in vals]
+            vals = oe_pr.loc[:,names].values
+            [ax.plot(times,v,"0.5",lw=0.2,alpha=0.2) for v in vals]
+            vals = oe_pt.loc[:,names].values
+            [ax.plot(times,v,"b",lw=0.2,alpha=0.2) for v in vals]
+            ax.set_title(ugroup,loc="left")
+            plt.tight_layout()
+            pdf.savefig()
+            plt.close(fig)
+                                    
+
 
 
 if __name__ == "__main__":
@@ -1409,10 +1446,10 @@ if __name__ == "__main__":
     #ensemble_stacking_experiment()
     #exit()
     
-    noptmax = 4
-    num_reals = 50
+    noptmax = 5
+    num_reals = 200
     num_workers = 20
-    include_forcing_pars = True
+    include_forcing_pars = False
 
     t_d = "monthly_template"
     truth_m_d = "monthly_truth_prior_master"
@@ -1470,9 +1507,10 @@ if __name__ == "__main__":
     #plotting
     m_ds = [direct_m_d,state_m_d,joint_m_d,staged_m_d,seq_m_d]
     #m_ds = [direct_m_d,state_m_d]
-    plot_forecast_combined(m_ds)
+    #plot_forecast_combined(m_ds)
     
     for m_d in m_ds:
+        plot_head_timeseries(m_d)
         make_kickass_figs(m_d)
         processing.plot_results_pub(m_d, pstf="freyberg", log_oe=False)
         processing.plot_histo_pub(m_d, pstf="freyberg", log_oe=False)
