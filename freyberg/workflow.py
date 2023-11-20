@@ -1407,9 +1407,9 @@ if __name__ == "__main__":
     #exit()
     
     noptmax = 4
-    num_reals = 200
-    num_workers = 25
-    include_forcing_pars = False
+    num_reals = 100
+    num_workers = 20
+    include_forcing_pars = True
 
     t_d = "monthly_template"
     truth_m_d = "monthly_truth_prior_master"
