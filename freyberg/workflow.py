@@ -1124,7 +1124,7 @@ def plot_domain(t_d):
 
     #tags = ["npfklayer1","npfklayer3","stosslayer1","stosslayer3"]
     names = ["A) Layer 1 HK","B) Layer 3 HK","C) Layer 1 SS","D) Layer 3 SS"]
-    cb_labels = ["$\\frac{m}{d}$","$\\frac{m}{d}","$\\frac{1}{m}","$\\frac{1}{m}"]
+    cb_labels = ["$\\frac{m}{d}$","$\\frac{m}{d}$","$\\frac{1}{m}$","$\\frac{1}{m}$"]
     for tag,ax,name,lab in zip(uprop_groups,axes,names,cb_labels):
         #k = int(tag[-1]) - 1
         tobs = pnzobs.loc[pnzobs.oname.str.contains(tag),:].copy()
