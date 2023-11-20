@@ -613,6 +613,7 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
     #exit()
     #truth_idx = 0
     truth_real = toe.index[truth_idx]
+    assert truth_real in tpe.index,truth_real
     truth = toe.loc[toe.index[truth_idx],:].to_dict()
     #lines = open(os.path.join(t_d,"freyberg6.obs"),'r').readlines()
     lines = open(os.path.join(t_d,"freyberg6.obs_continuous_heads.csv.txt"),'r').readlines()
@@ -857,7 +858,7 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
 
     pst.control_data.noptmax = -2
     pst.write(os.path.join(t_d,"freyberg.pst"),version=2)
-    pyemu.os_utils.run("pestpp-ies freyberg.pst",cwd=t_d)
+    #pyemu.os_utils.run("pestpp-ies freyberg.pst",cwd=t_d)
     print(pst.observation_data.loc[
               pst.nnz_obs_names,
               ["obsval", "weight", "lower_bound", "upper_bound"]])
@@ -875,12 +876,14 @@ def set_obsvals_weights(t_d,truth_m_d,double_ineq_ss=True,include_modflow_obs=Fa
 
 
     #pst.observation_data.loc[:,"obsval"] = toe.loc[toe.index[truth_idx],pst.obs_names].values
-    pst.parameter_data.loc[:,"parval1"] = tpe.loc[tpe.index[truth_idx],pst.par_names].values
+    pst.parameter_data.loc[:,"parval1"] = tpe.loc[truth_real,pst.par_names].values
     #pst.observation_data.loc[:,"weight"] = 1.0
     pst.control_data.noptmax = 0
     pst.write(os.path.join(t_d,"truth.pst"),version=2)
     pyemu.os_utils.run("pestpp-ies truth.pst",cwd=t_d)
     pst = pyemu.Pst(os.path.join(t_d,'truth.pst'))
+    print("truth idx,real",truth_idx,truth_real)
+    print("truth par vals",tpe.loc[truth_real,:])
     print("truth phi",pst.phi)
     assert pst.phi < 0.1
 
@@ -1407,7 +1410,7 @@ if __name__ == "__main__":
     #exit()
     
     noptmax = 4
-    num_reals = 100
+    num_reals = 50
     num_workers = 20
     include_forcing_pars = True
 
@@ -1424,6 +1427,7 @@ if __name__ == "__main__":
     if not os.path.exists(ppu_dir):
         ppu_dir = os.path.join("..","..","..","pypestutils")
     assert os.path.exists(ppu_dir)
+    
     # prep stuff
     daily_to_monthly()  
 
@@ -1436,6 +1440,7 @@ if __name__ == "__main__":
     
     set_obsvals_weights(t_d,truth_m_d,include_modflow_obs=True)
     plot_domain(t_d)
+
     
     build_localizer(t_d)
     
