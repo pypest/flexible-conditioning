@@ -1447,9 +1447,9 @@ if __name__ == "__main__":
     #exit()
     
     noptmax = 5
-    num_reals = 200
+    num_reals =200
     num_workers = 20
-    include_forcing_pars = False
+    include_forcing_pars = True
 
     t_d = "monthly_template"
     truth_m_d = "monthly_truth_prior_master"
@@ -1507,7 +1507,7 @@ if __name__ == "__main__":
     #plotting
     m_ds = [direct_m_d,state_m_d,joint_m_d,staged_m_d,seq_m_d]
     #m_ds = [direct_m_d,state_m_d]
-    #plot_forecast_combined(m_ds)
+    plot_forecast_combined(m_ds)
     
     for m_d in m_ds:
         plot_head_timeseries(m_d)
